@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review-watch/config",
+  "title": "review-watch config",
+  "type": "object",
+  "properties": {
+    "hooks": {
+      "type": "object"
+    }
+  },
+  "additionalProperties": true
+}
