@@ -1,6 +1,6 @@
 [project]
 name = "review-watch"
-version = "0.0.0"
+version = "0.0.1"
 description = "Watch for review requests and run reviews hands-free, with drafts you accept."
 readme = "README.md"
 requires-python = ">=3.12"
