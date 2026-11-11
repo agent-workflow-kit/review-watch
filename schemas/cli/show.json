@@ -36,6 +36,15 @@
         "$ref": "../defs.json#/$defs/next_action"
       },
       "uniqueItems": true
+    },
+    "finalize": {
+      "enum": [
+        "done",
+        "busy",
+        "skipped",
+        null
+      ],
+      "description": "done: finalize ran; busy: the round's lease is held and the stored row is printed; skipped: nothing to finalize or --no-refresh; null: no round."
     }
   },
   "additionalProperties": false,
@@ -44,6 +53,7 @@
     "round",
     "revisions",
     "hooks",
-    "next_actions"
+    "next_actions",
+    "finalize"
   ]
 }

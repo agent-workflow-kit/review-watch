@@ -12,8 +12,9 @@
 hosts:
   - git.example.com
 
-# Repo-id globs (* within a path segment, ** across segments). exclude wins.
-include: ["*"]
+# Repo-id globs (path matching: * and ? within a path segment, a ** segment across
+# segments). exclude wins. Global only: a repo cannot set its own scope.
+include: ["**"]
 exclude: []
 
 # Your own account. Unset keys use the authenticated user reported by forgectl.
@@ -23,29 +24,30 @@ me:
   # gitlab: my-login
 
 max_rounds: 3        # rounds per PR across request instances; per-repo override allowed
-max_concurrent: 2    # detached review processes at once; only used without jobsctl
+max_concurrent: 2    # rounds with a running run; used without jobsctl or when jobsctl reports no limit
 max_attempts: 2      # runs per round before it fails
 
 jobs:
   use_jobsctl: auto  # auto, true or false
-  queue: reviews     # jobsctl queue; needs kill_grace of at least 120s (125s with run_pr_code)
+  queue: reviews     # jobsctl queue; review-watch passes --kill-grace 125s and --max-retries 0
   pass_env: []       # env var names for jobsctl --pass-env; values come from jobsctl's env file
 
 review:
   skill: null        # review-run's default skill when null
-  mode: headless     # headless or interactive
-  previous: true     # pass --previous to review-run for round 2 and later
+  previous: true     # pass the PR's newest done review as --previous to review-run
 
-# Risk tier thresholds. A per-repo override may only be lower (stricter), never higher.
+# Risk tier thresholds. A per-repo override may only be lower or equal (stricter), never higher.
 tiers:
   lines: [50, 300]   # changed lines: above the first is tier 1, above the second tier 2
   files: [3, 15]     # changed files: same
   sensitive_globs: []   # paths that make a round at least tier 2; per-repo values add
-  trusted_authors: []   # logins treated as members on hosts without author associations
-  allow_forks: true     # false makes a fork PR tier 3
+  trusted_authors: []   # logins (case-insensitive) treated as members where author_association is null (GitLab); global only
+  allow_forks: true     # false makes a fork PR tier 3; a per-repo value may only be false
 
-# Paths that make a round tier 3 and block any automatic action. Per-repo values add
-# to this list and never remove from it.
+# Paths that make a round tier 3 and block any automatic action. A pattern without a
+# slash matches the last path segment at any depth; a pattern with a slash is anchored at
+# the repo root; ASCII case is folded. Per-repo values add to this list and never remove
+# from it.
 off_limits:
   - ".github/**"
   - ".gitlab-ci.yml"
@@ -53,55 +55,64 @@ off_limits:
   - ".circleci/**"
   - "Jenkinsfile"
   - "azure-pipelines.yml"
-  - "**/Dockerfile*"
+  - "Dockerfile*"
+  - "docker-compose*"
   - "Makefile"
-  - ".claude/**"
+  - "GNUmakefile"
+  - ".husky/**"
+  - ".pre-commit-config.yaml"
+  - ".gitmodules"
+  - "**/.claude/**"
   - ".mcp.json"
-  - "**/CLAUDE*.md"
-  - "**/AGENTS.md"
+  - "CLAUDE*.md"
+  - "AGENTS.md"
   - "CODEOWNERS"
-  - ".github/CODEOWNERS"
-  - "docs/CODEOWNERS"
   - "**/auth/**"
   - "**/security/**"
   - "**/secrets/**"
   - "**/crypto/**"
-  - "**/*.pem"
-  - "**/*.key"
+  - "*.pem"
+  - "*.key"
   - ".env"
   - ".env.*"
 
 # Highest tier at which an automatic post or approve is even considered (0 to 3).
-# Per-repo overrides may only be lower.
+# Per-repo overrides may only be lower or equal.
 max_post_tier: 1
 max_approve_tier: 0
 
-# Automatic actions are off by default and are enabled per repo (see repos below).
-# These global values are the defaults for a repo that does not set its own.
+# Automatic actions are off by default. These global values are the default for every repo
+# that does not set its own; enable them per repo (see repos below). auto_approve.enabled
+# without auto_post.enabled for the same repo is a config error. Safety keys (max_*_tier,
+# tiers, off_limits, auto_*, gate, limits) cannot be set from the environment.
 auto_post:
   enabled: false
   policy: review-post      # gatectl policy
 auto_approve:
   enabled: false
   policy: review-approve   # gatectl policy; pr-comment also needs allow_auto_approve for the repo
+  trusted_author_ids: []   # global only: account ids; an automatic approve needs the PR author's id here
+  # paths is per repo only (see repos below): an automatic approve needs every changed path
+  # to match; empty means no automatic approve in that repo.
 
 gate:
-  timeout: 60s       # gatectl check --timeout
+  timeout: 60s       # 1s to 86400s; passed to gatectl check --timeout in whole seconds
 
-spend:
-  daily_cap_usd: null   # null is off; at the cap new rounds stay queued
+limits:
+  rounds_per_day: 50    # rounds started per local day; at the limit new rounds stay queued; null is off
   timezone: null        # IANA zone name; null is the machine's local zone
 
 poll:
   max_snapshots: 30        # snapshots per host and cycle
+  recheck_interval: 1h     # how often unchanged items without a live round are re-read
   failure_alert_after: 3   # consecutive failing cycles before post-attention fires for a host
 
 retention:
-  closed: 90d        # prune deletes closed, rejected, posted and skipped items older than this
+  closed: 90d        # prune deletes closed items older than this; other items lose old revisions only
 
 cron:
-  schedule: "*/5 * * * *"
-  env_file: null     # sourced before poll in the cron line, for example /home/me/.config/review-watch/env
+  schedule: "*/5 * * * *"   # five fields of [0-9*/,-] or month and day names
+  env_file: null     # sourced before poll in the cron line, for example ~/.config/review-watch/env
 
 # Sibling tool commands: an argv list run without a shell. Use absolute paths under cron.
 forgectl_cmd: [forgectl]
@@ -111,9 +122,9 @@ gatectl_cmd: [gatectl]
 jobsctl_cmd: [jobsctl]
 
 # Hooks: pre-round (may veto with a non-zero exit, escalate with 13), post-draft,
-# post-attention, post-post. Each entry: cmd (run with sh -c), timeout in seconds
-# (default 30), async (post hooks only). Payloads are JSON on stdin and never hold text
-# from a host or a model.
+# post-attention, post-post. Each entry: cmd (run with sh -c), timeout (a duration such as
+# 45s, or a bare integer in seconds; default 30), async (post hooks only; refused on
+# pre-round). Payloads are JSON on stdin and never hold text from a host or a model.
 hooks:
   pre-round: []
   post-draft: []
@@ -124,9 +135,10 @@ hooks:
   #     timeout: 30
   #     async: true
 
-# Per-repo overrides, keyed by repo id (host/<full project path>). Allowed keys: include,
-# exclude, max_rounds, tiers, max_post_tier, max_approve_tier, off_limits, auto_post,
-# auto_approve, review.skill.
+# Per-repo overrides, keyed by the canonical repo id (host/<full project path>, exactly as
+# forgectl returns it). Allowed keys: max_rounds, max_attempts, max_concurrent, tiers (lines,
+# files, sensitive_globs, allow_forks), max_post_tier, max_approve_tier, off_limits,
+# auto_post, auto_approve (enabled, policy, paths), review.skill.
 repos:
   git.example.com/team/service:
     max_rounds: 2
@@ -140,5 +152,6 @@ repos:
       policy: review-post
     auto_approve:
       enabled: false
+      paths: []        # globs; an automatic approve needs every changed path to match
     review:
       skill: null

@@ -35,42 +35,30 @@
         "minimum": 0
       }
     },
-    "spend": {
+    "today": {
       "type": "object",
       "properties": {
-        "today_usd": {
-          "type": [
-            "number",
-            "null"
-          ],
-          "minimum": 0
-        },
-        "cap_usd": {
-          "type": [
-            "number",
-            "null"
-          ],
-          "minimum": 0
-        },
-        "runs": {
+        "rounds_started": {
           "type": "integer",
           "minimum": 0
         },
-        "unknown_cost": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "cost_unavailable": {
-          "type": "boolean"
+        "limit": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "limits.rounds_per_day; null is off."
         }
       },
       "additionalProperties": false,
       "required": [
-        "today_usd",
-        "cap_usd",
-        "runs",
-        "unknown_cost",
-        "cost_unavailable"
+        "rounds_started",
+        "limit"
       ]
     },
     "waiting": {
@@ -80,7 +68,11 @@
           "type": "integer",
           "minimum": 0
         },
-        "spend_cap": {
+        "daily_limit": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "held": {
           "type": "integer",
           "minimum": 0
         }
@@ -88,7 +80,8 @@
       "additionalProperties": false,
       "required": [
         "waiting_slot",
-        "spend_cap"
+        "daily_limit",
+        "held"
       ]
     },
     "last_poll": {
@@ -123,13 +116,18 @@
                   "consecutive_failures": {
                     "type": "integer",
                     "minimum": 0
+                  },
+                  "snapshots_deferred": {
+                    "type": "integer",
+                    "minimum": 0
                   }
                 },
                 "additionalProperties": false,
                 "required": [
                   "host",
                   "error",
-                  "consecutive_failures"
+                  "consecutive_failures",
+                  "snapshots_deferred"
                 ]
               }
             }
@@ -149,6 +147,14 @@
     "out_of_scope": {
       "type": "integer",
       "minimum": 0
+    },
+    "unmatched_repo_keys": {
+      "type": "array",
+      "items": {
+        "$ref": "../defs.json#/$defs/repo_id"
+      },
+      "uniqueItems": true,
+      "description": "repos.<id> keys that matched no seen repo in the last 30 days."
     },
     "gatectl": {
       "oneOf": [
@@ -192,10 +198,11 @@
     "items",
     "rounds",
     "skipped",
-    "spend",
+    "today",
     "waiting",
     "last_poll",
     "out_of_scope",
+    "unmatched_repo_keys",
     "gatectl"
   ]
 }

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "review-watch/cli/cron-uninstall.json",
   "title": "cron uninstall --json",
-  "description": "block is the block removed (or that would be removed), null when none existed.",
+  "description": "block is the block removed (or that would be removed) as a list of lines, null when none existed.",
   "type": "object",
   "properties": {
     "action": {
@@ -15,11 +15,19 @@
       "type": "boolean"
     },
     "block": {
-      "type": [
-        "string",
-        "null"
-      ],
-      "maxLength": 8192
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 4096
+          },
+          "maxItems": 16
+        },
+        {
+          "type": "null"
+        }
+      ]
     }
   },
   "additionalProperties": false,

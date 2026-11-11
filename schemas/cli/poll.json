@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "review-watch/cli/poll.json",
   "title": "poll --json",
-  "description": "The poll report. With poll --dry-run the same shape previews what would start. On exit 12 all_hosts_failed the report also carries `error` (the error envelope body). Exit 0 omits `error`.",
+  "description": "The poll report (exit 0). With --no-start the cycle discovers and finalizes but submits and gates nothing. Exit 12 prints only the error envelope (cli/error.json), with details.hosts for all_hosts_failed.",
   "type": "object",
   "properties": {
     "started_at": {
@@ -46,9 +46,6 @@
     },
     "already_running": {
       "$ref": "../defs.json#/$defs/poll_report/properties/already_running"
-    },
-    "error": {
-      "$ref": "../defs.json#/$defs/error_body"
     }
   },
   "additionalProperties": false,

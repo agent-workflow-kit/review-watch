@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review-watch/cli/browse-result.json",
+  "title": "browse --result-file",
+  "description": "Written only on exit 0. done lists the actions taken inside the TUI.",
+  "type": "object",
+  "properties": {
+    "intent": {
+      "enum": [
+        "open",
+        "back",
+        "done"
+      ]
+    },
+    "selected": {
+      "type": "array",
+      "items": {
+        "anyOf": [
+          {
+            "$ref": "../defs.json#/$defs/item_id"
+          },
+          {
+            "$ref": "../defs.json#/$defs/round_id"
+          }
+        ]
+      }
+    },
+    "done": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "enum": [
+              "accept",
+              "edit",
+              "reject",
+              "rerun",
+              "resume"
+            ]
+          },
+          "round": {
+            "$ref": "../defs.json#/$defs/round_id"
+          },
+          "exit_code": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "action",
+          "round",
+          "exit_code"
+        ]
+      }
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "intent",
+    "selected",
+    "done"
+  ]
+}

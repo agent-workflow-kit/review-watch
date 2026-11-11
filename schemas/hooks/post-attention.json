@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "review-watch/hooks/post-attention.json",
   "title": "post-attention hook payload (stdin)",
-  "description": "Something needs a human. Fires once per cause (per round, per item for round_limit, per host for poll_failed). No text.",
+  "description": "Something needs a human. Fires once per cause (per round, per item for round_limit and daily_limit, per host for poll_failed); at least once, deduplicate by event_id. No text.",
   "type": "object",
   "properties": {
     "tool": {
@@ -48,8 +48,8 @@
     },
     "event_id": {
       "type": "string",
-      "pattern": "^(?:rw-[a-z2-7]{8}(?:#[0-9]+)?|[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*(?::[0-9]{1,5})?)-(?:post-draft|post-attention)-[0-9]+$",
-      "description": "<id>-<hook>-<n>, the deduplication key."
+      "pattern": "^(?:rw-[a-z2-7]{8}(?:#[0-9]+)?|[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*(?::[0-9]{1,5})?)-(?:post-draft|post-attention|post-post)-[0-9]+$",
+      "description": "<object id>-<hook>-<n>, the deduplication key (n is the cause's sequence)."
     },
     "pr": {
       "oneOf": [
@@ -98,6 +98,21 @@
     "details": {
       "type": "object",
       "properties": {
+        "kind": {
+          "oneOf": [
+            {
+              "enum": [
+                "session",
+                "pre_run",
+                "pre_round"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "For escalated: session, pre_run or pre_round."
+        },
         "failure_reason": {
           "oneOf": [
             {
@@ -144,6 +159,7 @@
       },
       "additionalProperties": false,
       "required": [
+        "kind",
         "failure_reason",
         "retryable",
         "stale_reason",
@@ -207,7 +223,10 @@
         "if": {
           "properties": {
             "reason": {
-              "const": "round_limit"
+              "enum": [
+                "round_limit",
+                "daily_limit"
+              ]
             }
           },
           "required": [

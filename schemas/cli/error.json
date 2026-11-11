@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "review-watch/cli/error.json",
   "title": "Error envelope (any command with --json)",
-  "description": "Printed on stdout for every non-zero exit except poll exit 12 all_hosts_failed (poll report) and accept --dry-run exit 20 (accept-dry-run).",
+  "description": "Printed on stdout for every non-zero exit, alone (no poll report, no plan).",
   "type": "object",
   "properties": {
     "error": {

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "review-watch/cli/resume.json",
   "title": "resume --json",
-  "description": "kind says whether review-run resume was called on a run or the held pre-run step was rerun with an override.",
+  "description": "kind says what was continued: a session escalation (review-run resume --no-wait), a pre-run escalation (a fresh launch with an override) or a pre-round hold.",
   "type": "object",
   "properties": {
     "round": {
@@ -20,8 +20,9 @@
     },
     "kind": {
       "enum": [
-        "run",
-        "pre_run_hold"
+        "session",
+        "pre_run",
+        "pre_round"
       ]
     },
     "dry_run": {

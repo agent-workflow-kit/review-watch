@@ -18,7 +18,9 @@
           "result": {
             "enum": [
               "deleted",
+              "trimmed",
               "would_delete",
+              "would_trim",
               "skipped"
             ]
           },

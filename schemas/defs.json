@@ -100,8 +100,8 @@
       "type": "string",
       "minLength": 1,
       "maxLength": 512,
-      "pattern": "^[A-Za-z0-9._*/:@+-]+$",
-      "description": "A repo-id or path glob (* within a segment, ** across segments)."
+      "pattern": "^[A-Za-z0-9._*?/:@+-]+$",
+      "description": "A repo-id or path glob (Path matching in docs/interface.md: * and ? within a segment, a ** segment across directories)."
     },
     "login": {
       "type": "string",
@@ -151,7 +151,7 @@
     "queue_reason": {
       "enum": [
         "waiting_slot",
-        "spend_cap",
+        "daily_limit",
         "held",
         "submit_failed",
         "retry_wait"
@@ -163,7 +163,8 @@
         "bot_author",
         "bot_unknown",
         "own_pr",
-        "already_reviewed"
+        "already_reviewed",
+        "hook_veto"
       ]
     },
     "stale_reason": {
@@ -184,11 +185,11 @@
         "escalated",
         "stale",
         "failed",
-        "expired",
         "round_limit",
-        "spend_cap",
-        "held",
-        "poll_failed"
+        "daily_limit",
+        "poll_failed",
+        "submit_failed",
+        "post_failed"
       ]
     },
     "failure_reason": {
@@ -214,10 +215,19 @@
         "internal",
         "no_run",
         "draft_invalid",
+        "pre_run_vetoed",
+        "launch_usage",
         "tool_missing",
         "tool_too_old",
+        "no_tmux",
+        "state_unsafe",
+        "schema_newer",
+        "plugin_changed",
+        "lower_failed",
+        "not_open",
         "unknown_host",
-        "pre_run_vetoed"
+        "lower_refused",
+        "lower_contract_mismatch"
       ],
       "description": "review-run's failed reasons plus no_run, draft_invalid and the reasons for a round that failed before its session."
     },
@@ -247,6 +257,7 @@
         "base_not_default",
         "fork_not_allowed",
         "input_missing",
+        "files_incomplete",
         "model_risk_high",
         "lines_high",
         "files_high",
@@ -267,7 +278,15 @@
         "meta_signal",
         "head_moved_since_draft",
         "reanchored",
-        "findings_block_approve"
+        "edited",
+        "facts_unbound",
+        "repo_changed",
+        "findings_block_approve",
+        "automatic_request_changes",
+        "approve_path_not_allowed",
+        "approve_author_not_trusted",
+        "gate_warning",
+        "gate_error"
       ]
     },
     "error_code": {
@@ -293,12 +312,12 @@
         "not_editable",
         "not_escalated",
         "round_active",
+        "round_busy",
         "round_limit",
-        "spend_cap",
+        "daily_limit",
         "stale_head",
         "retargeted",
         "revision_changed",
-        "human_required",
         "item_closed",
         "stale_base",
         "plan_changed",
@@ -321,12 +340,12 @@
         "not_editable",
         "not_escalated",
         "round_active",
+        "round_busy",
         "round_limit",
-        "spend_cap",
+        "daily_limit",
         "stale_head",
         "retargeted",
         "revision_changed",
-        "human_required",
         "item_closed",
         "stale_base",
         "plan_changed",
@@ -343,8 +362,15 @@
         "lower_refused",
         "approve_conflicts_event",
         "invalid_draft",
+        "usage",
+        "tool_missing",
+        "tool_too_old",
+        "state_unsafe",
         "all_hosts_failed",
-        "lower_contract_mismatch"
+        "lower_contract_mismatch",
+        "lower_failed",
+        "human_required",
+        "confirmation_required"
       ],
       "description": "Exit 20 refusal reasons plus the reasons of exit 2 and 12."
     },
@@ -457,10 +483,11 @@
     },
     "trigger": {
       "enum": [
-        "new_request",
         "first_sight",
-        "rerun",
-        "skip_cleared"
+        "new_request",
+        "re_request",
+        "skip_cleared",
+        "rerun"
       ]
     },
     "hook_name": {
@@ -492,6 +519,18 @@
             "integer",
             "null"
           ]
+        },
+        "lower_reason": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]{0,63}$"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The lower tool's reason when the failure passed one through; else null."
         }
       },
       "additionalProperties": false,
@@ -499,9 +538,10 @@
         "reason",
         "retryable",
         "retry_after_s",
-        "exit_code"
+        "exit_code",
+        "lower_reason"
       ],
-      "description": "Copied from review-run's failure or set by review-watch; closed codes and counts only."
+      "description": "Copied from review-run's failure or set by review-watch; closed codes and counts only. exit_code is the exit of the job or call when no run existed."
     },
     "gate": {
       "type": "object",
@@ -534,6 +574,29 @@
         "enforced": {
           "type": "boolean"
         },
+        "state": {
+          "enum": [
+            "enforced",
+            "shadow",
+            "off",
+            "not_applicable"
+          ],
+          "description": "What the gate call reported. shadow, off and not_applicable are stored with enforced false (and decision null for off)."
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "definition_changed",
+              "repo_mismatch",
+              "repo_invalid",
+              "config_problem",
+              "output_truncated"
+            ]
+          },
+          "uniqueItems": true,
+          "description": "Any warning means no action (auto_blocked_by gate_warning)."
+        },
         "error": {
           "oneOf": [
             {
@@ -545,7 +608,12 @@
               "type": "null"
             }
           ],
-          "description": "gate_error when gatectl exited 1 or 2; no action was taken."
+          "description": "gate_error when gatectl exited 1, 2 or 12, its output could not be parsed or it is missing; no decision is recorded."
+        },
+        "attempts": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Calls made for this policy; a gate_error is retried on the next three cycles."
         },
         "outcome": {
           "oneOf": [
@@ -568,11 +636,14 @@
         "decision_id",
         "decision",
         "enforced",
+        "state",
+        "warnings",
         "error",
+        "attempts",
         "outcome",
         "checked_at"
       ],
-      "description": "A gate record: the decision id, the would-be decision and the enforced flag."
+      "description": "A gate record: the policy, the decision id, the would-be decision, the enforced flag and what the call reported."
     },
     "meta": {
       "type": "object",
@@ -710,12 +781,6 @@
             ]
           }
         },
-        "landed": {
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
         "already_posted": {
           "type": [
             "boolean",
@@ -724,6 +789,15 @@
         },
         "plan_sha256": {
           "$ref": "#/$defs/sha256"
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{0,63}$"
+          },
+          "uniqueItems": true,
+          "description": "post.warnings: landed with a warning (quick_action_ran, approved_stale_head, audit_failed)."
         }
       },
       "additionalProperties": false,
@@ -731,11 +805,11 @@
         "review_id",
         "posted_inline",
         "moved",
-        "landed",
         "already_posted",
-        "plan_sha256"
+        "plan_sha256",
+        "warnings"
       ],
-      "description": "The stored pr-comment result."
+      "description": "The stored pr-comment result. pr-comment's success result has no landed field."
     },
     "post_error": {
       "type": "object",
@@ -781,6 +855,89 @@
       ],
       "description": "Set while a round is posting after a failure; running the same accept again is the answer."
     },
+    "post_intent": {
+      "type": "object",
+      "properties": {
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "revision_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "approve": {
+          "type": "boolean"
+        },
+        "reanchor_to": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "actor": {
+          "$ref": "#/$defs/actor"
+        },
+        "decision_ids": {
+          "$ref": "#/$defs/decision_ids"
+        },
+        "plan_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "automatic": {
+          "type": "boolean"
+        },
+        "started_at": {
+          "$ref": "#/$defs/ts"
+        },
+        "holder": {
+          "type": "object",
+          "properties": {
+            "pid": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "process_started_at": {
+              "$ref": "#/$defs/ts"
+            },
+            "expires_at": {
+              "$ref": "#/$defs/ts"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "pid",
+            "process_started_at",
+            "expires_at"
+          ],
+          "description": "PID plus process start time plus a 15-minute expiry renewed while the call runs."
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "revision",
+        "revision_sha256",
+        "approve",
+        "reanchor_to",
+        "actor",
+        "decision_ids",
+        "plan_sha256",
+        "automatic",
+        "started_at",
+        "holder"
+      ],
+      "description": "Stored by the compare-and-set that moves a round to posting; every later attempt uses exactly this intent."
+    },
     "round": {
       "type": "object",
       "properties": {
@@ -808,12 +965,17 @@
           ]
         },
         "head_sha": {
-          "$ref": "#/$defs/sha"
+          "$ref": "#/$defs/sha",
+          "description": "The PR head at creation, refreshed while queued, set to anchor.head_sha when the draft is stored (and to the new head after a re-anchor)."
         },
         "base_ref": {
           "$ref": "#/$defs/base_ref"
         },
         "tier": {
+          "$ref": "#/$defs/tier",
+          "description": "The gate's tier once drafted (computed from facts bound to the draft's head), else the creation tier."
+        },
+        "tier_at_creation": {
           "$ref": "#/$defs/tier"
         },
         "tier_reasons": {
@@ -852,7 +1014,12 @@
         },
         "attempt": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 0,
+          "description": "The number of runs started for the round."
+        },
+        "session_launched": {
+          "type": "boolean",
+          "description": "Set when finalize first sees a run of the round with a non-null agent_id; counts the round toward max_rounds."
         },
         "job_id": {
           "oneOf": [
@@ -932,6 +1099,41 @@
             }
           ]
         },
+        "escalation_kind": {
+          "oneOf": [
+            {
+              "enum": [
+                "pre_run",
+                "session"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "not_before": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ts"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "A queued retry is not submitted before this time (retry_after_s)."
+        },
+        "last_failure": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/failure"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The failure of the last run that was retried."
+        },
         "failure": {
           "oneOf": [
             {
@@ -989,6 +1191,16 @@
             }
           ]
         },
+        "post_intent": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/post_intent"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "post_error": {
           "oneOf": [
             {
@@ -998,6 +1210,9 @@
               "type": "null"
             }
           ]
+        },
+        "post_unconfirmed": {
+          "type": "boolean"
         },
         "hook_decision_ids": {
           "$ref": "#/$defs/decision_ids"
@@ -1054,11 +1269,13 @@
         "head_sha",
         "base_ref",
         "tier",
+        "tier_at_creation",
         "tier_reasons",
         "run_id",
         "run_ids",
         "phase",
         "attempt",
+        "session_launched",
         "job_id",
         "draft_id",
         "revision",
@@ -1068,13 +1285,18 @@
         "stale_head_sha",
         "stale_since",
         "escalated_since",
+        "escalation_kind",
+        "not_before",
+        "last_failure",
         "failure",
         "post_gate",
         "approve_gate",
         "auto_blocked_by",
         "meta",
         "post",
+        "post_intent",
         "post_error",
+        "post_unconfirmed",
         "hook_decision_ids",
         "reject_reason",
         "closed_reason",
@@ -1122,6 +1344,23 @@
             }
           ]
         },
+        "vetoed_head_sha": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The head a pre-round hook vetoed; the veto is re-asked only when the listed head differs."
+        },
+        "hook_decision_ids": {
+          "$ref": "#/$defs/decision_ids"
+        },
+        "unreachable": {
+          "type": "boolean"
+        },
         "rounds": {
           "type": "integer",
           "minimum": 0
@@ -1152,12 +1391,43 @@
         "instance",
         "state",
         "skip_reason",
+        "vetoed_head_sha",
+        "hook_decision_ids",
+        "unreachable",
         "rounds",
         "latest_round",
         "first_seen_at",
         "last_seen_at"
       ],
-      "description": "One review request keyed by (pr_id, reviewer, instance). skip_reason is non-null exactly when state is skipped."
+      "description": "One review request keyed by (pr_id, reviewer, instance). skip_reason is non-null exactly when state is skipped.",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "skipped"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "skip_reason": {
+                "$ref": "#/$defs/skip_reason"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "skip_reason": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
     },
     "revision": {
       "type": "object",
@@ -1254,6 +1524,11 @@
           "type": "integer",
           "minimum": 0
         },
+        "snapshots_deferred": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Candidates beyond poll.max_snapshots that wait for the next cycle."
+        },
         "error": {
           "oneOf": [
             {
@@ -1271,6 +1546,7 @@
         "listed",
         "complete",
         "snapshots",
+        "snapshots_deferred",
         "error"
       ]
     },
@@ -1392,7 +1668,7 @@
         "errors",
         "already_running"
       ],
-      "description": "The poll cycle's counts."
+      "description": "The poll cycle's counts, each for this cycle: discovered (listed candidates in scope), new_items, skipped (items that became skipped), out_of_scope, finalized, stale, closed, started, queued (rounds left queued). With already_running true the counts are zero and started_at equals finished_at."
     },
     "error_body": {
       "type": "object",
@@ -1440,6 +1716,36 @@
             "install": {
               "type": "string",
               "maxLength": 256
+            },
+            "state": {
+              "$ref": "#/$defs/round_state"
+            },
+            "tool": {
+              "type": "string",
+              "maxLength": 64
+            },
+            "path": {
+              "type": "string",
+              "maxLength": 4096
+            },
+            "hosts": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "host": {
+                    "$ref": "#/$defs/host"
+                  },
+                  "code": {
+                    "$ref": "#/$defs/failure_code"
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "host",
+                  "code"
+                ]
+              }
             }
           },
           "additionalProperties": true
@@ -1491,6 +1797,18 @@
               "type": "null"
             }
           ]
+        },
+        "hook": {
+          "oneOf": [
+            {
+              "type": "string",
+              "maxLength": 128
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Copied from review-run's or pr-comment's escalation envelope."
         },
         "escalated_by": {
           "oneOf": [

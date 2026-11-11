@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "review-watch/log.json",
   "title": "review-watch log.jsonl record",
-  "description": "Public, append-only. State transitions, poll cycles, gate calls, hook results, finalize steps and warnings. No text from a host or a model.",
+  "description": "Public, append-only. State transitions, poll cycles, gate calls, hook results, finalize steps, renames and warnings (warning code previous_unavailable: a --previous run was gone). No text from a host or a model.",
   "oneOf": [
     {
       "type": "object",
@@ -210,10 +210,7 @@
         "reason": {
           "enum": [
             "round_limit",
-            "hook_veto",
-            "spend_cap",
-            "capacity",
-            "pre_round_error"
+            "hook_veto"
           ]
         }
       },
@@ -517,6 +514,46 @@
         "round",
         "decision_id",
         "outcome"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "ts": {
+          "$ref": "defs.json#/$defs/ts"
+        },
+        "level": {
+          "enum": [
+            "debug",
+            "info",
+            "warn",
+            "error"
+          ]
+        },
+        "event": {
+          "const": "item_renamed"
+        },
+        "item": {
+          "$ref": "defs.json#/$defs/item_id"
+        },
+        "pr": {
+          "$ref": "defs.json#/$defs/pr"
+        },
+        "repo": {
+          "$ref": "defs.json#/$defs/repo_id"
+        },
+        "previous_repo": {
+          "$ref": "defs.json#/$defs/repo_id"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "ts",
+        "level",
+        "event",
+        "item",
+        "pr",
+        "repo"
       ]
     },
     {

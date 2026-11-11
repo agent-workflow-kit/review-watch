@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "review-watch/config.json",
   "title": "review-watch config",
-  "description": "Self-contained (no external $ref). Unknown keys are refused. Defaults are those of docs/interface.md, Config. Per-repo tiers.lines, tiers.files, max_post_tier and max_approve_tier may only be stricter than the global value: the loader checks that, JSON Schema cannot.",
+  "description": "Self-contained (no external $ref). Unknown keys are refused. Defaults are those of docs/interface.md, Config. Cross-field and cross-document rules (docs/interface.md, Config validation) are loader checks that JSON Schema cannot express: per-repo tiers.lines, tiers.files, max_post_tier and max_approve_tier may only be lower or equal; auto_approve.enabled needs auto_post.enabled for the same repo; the gate.timeout upper bound; no safety key from the environment.",
   "type": "object",
   "properties": {
     "hosts": {
@@ -43,8 +43,9 @@
       },
       "uniqueItems": true,
       "default": [
-        "*"
-      ]
+        "**"
+      ],
+      "description": "Repo-id globs (Path matching segment rules without the any-depth rule). Global only."
     },
     "exclude": {
       "type": "array",
@@ -52,7 +53,8 @@
         "$ref": "#/$defs/glob"
       },
       "uniqueItems": true,
-      "default": []
+      "default": [],
+      "description": "Wins over include. Global only."
     },
     "me": {
       "type": "object",
@@ -132,13 +134,6 @@
           "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$",
           "default": null
         },
-        "mode": {
-          "enum": [
-            "headless",
-            "interactive"
-          ],
-          "default": "headless"
-        },
         "previous": {
           "type": "boolean",
           "default": true
@@ -169,7 +164,7 @@
             50,
             300
           ],
-          "description": "[medium, high] changed-line thresholds; a per-repo value may only be lower (loader check)."
+          "description": "[medium, high] changed-line thresholds; a per-repo value may only be lower elementwise (loader check)."
         },
         "files": {
           "type": "array",
@@ -191,7 +186,7 @@
             3,
             15
           ],
-          "description": "[medium, high] changed-file thresholds; a per-repo value may only be lower (loader check)."
+          "description": "[medium, high] changed-file thresholds; a per-repo value may only be lower elementwise (loader check)."
         },
         "sensitive_globs": {
           "type": "array",
@@ -208,7 +203,8 @@
             "$ref": "#/$defs/login"
           },
           "uniqueItems": true,
-          "default": []
+          "default": [],
+          "description": "Logins compared case-insensitively, applied only where author_association is null. Global only."
         },
         "allow_forks": {
           "type": "boolean",
@@ -269,6 +265,15 @@
           "type": "string",
           "pattern": "^[A-Za-z0-9._:-]{1,64}$",
           "default": "review-approve"
+        },
+        "trusted_author_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/account_id"
+          },
+          "uniqueItems": true,
+          "default": [],
+          "description": "Global only. Account ids (compared by id); an automatic approve requires the PR author's id here."
         }
       },
       "additionalProperties": false
@@ -277,22 +282,26 @@
       "type": "object",
       "properties": {
         "timeout": {
-          "$ref": "#/$defs/duration",
-          "default": "60s"
+          "type": "string",
+          "pattern": "^[1-9][0-9]*(?:s|m|h|d)$",
+          "default": "60s",
+          "description": "A duration of 1 s to 86400 s (loader check of the upper bound), passed to gatectl in whole seconds."
         }
       },
       "additionalProperties": false
     },
-    "spend": {
+    "limits": {
       "type": "object",
       "properties": {
-        "daily_cap_usd": {
+        "rounds_per_day": {
           "type": [
-            "number",
+            "integer",
             "null"
           ],
-          "minimum": 0,
-          "default": null
+          "minimum": 1,
+          "maximum": 100000,
+          "default": 50,
+          "description": "Rounds started per local day; null is off."
         },
         "timezone": {
           "type": [
@@ -320,6 +329,10 @@
           "minimum": 1,
           "maximum": 1000,
           "default": 3
+        },
+        "recheck_interval": {
+          "$ref": "#/$defs/duration",
+          "default": "1h"
         }
       },
       "additionalProperties": false
@@ -339,9 +352,10 @@
       "properties": {
         "schedule": {
           "type": "string",
-          "pattern": "^\\S+(?: \\S+){4}$",
+          "pattern": "^[0-9A-Za-z*/,-]+(?: [0-9A-Za-z*/,-]+){4}$",
           "maxLength": 128,
-          "default": "*/5 * * * *"
+          "default": "*/5 * * * *",
+          "description": "Five fields of [0-9*/,-] or month and day names."
         },
         "env_file": {
           "type": [
@@ -350,7 +364,9 @@
           ],
           "minLength": 1,
           "maxLength": 4096,
-          "default": null
+          "pattern": "^[^\\x00-\\x1f\\x7f'%]+$",
+          "default": null,
+          "description": "Refused when it holds a control character, a single quote, a percent sign or a newline."
         }
       },
       "additionalProperties": false
@@ -434,10 +450,18 @@
                 "maxLength": 4096
               },
               "timeout": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 600,
-                "default": 30
+                "oneOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 600
+                  },
+                  {
+                    "$ref": "#/$defs/duration"
+                  }
+                ],
+                "default": 30,
+                "description": "A duration; a bare integer means seconds (1 to 600)."
               },
               "async": {
                 "type": "boolean"
@@ -460,10 +484,18 @@
                 "maxLength": 4096
               },
               "timeout": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 600,
-                "default": 30
+                "oneOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 600
+                  },
+                  {
+                    "$ref": "#/$defs/duration"
+                  }
+                ],
+                "default": 30,
+                "description": "A duration; a bare integer means seconds (1 to 600)."
               },
               "async": {
                 "type": "boolean"
@@ -486,10 +518,18 @@
                 "maxLength": 4096
               },
               "timeout": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 600,
-                "default": 30
+                "oneOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 600
+                  },
+                  {
+                    "$ref": "#/$defs/duration"
+                  }
+                ],
+                "default": 30,
+                "description": "A duration; a bare integer means seconds (1 to 600)."
               },
               "async": {
                 "type": "boolean"
@@ -512,10 +552,18 @@
                 "maxLength": 4096
               },
               "timeout": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 600,
-                "default": 30
+                "oneOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 600
+                  },
+                  {
+                    "$ref": "#/$defs/duration"
+                  }
+                ],
+                "default": 30,
+                "description": "A duration; a bare integer means seconds (1 to 600)."
               },
               "async": {
                 "type": "boolean"
@@ -537,24 +585,20 @@
         "^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*(?::[0-9]{1,5})?(?:/(?!\\.\\.?(?:/|$))[A-Za-z0-9._-]+)+$": {
           "type": "object",
           "properties": {
-            "include": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/glob"
-              },
-              "uniqueItems": true
-            },
-            "exclude": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/glob"
-              },
-              "uniqueItems": true
-            },
             "max_rounds": {
               "type": "integer",
               "minimum": 1,
               "maximum": 1000
+            },
+            "max_attempts": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20
+            },
+            "max_concurrent": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 64
             },
             "tiers": {
               "type": "object",
@@ -579,7 +623,7 @@
                     50,
                     300
                   ],
-                  "description": "[medium, high] changed-line thresholds; a per-repo value may only be lower (loader check)."
+                  "description": "[medium, high] changed-line thresholds; a per-repo value may only be lower elementwise (loader check)."
                 },
                 "files": {
                   "type": "array",
@@ -601,7 +645,7 @@
                     3,
                     15
                   ],
-                  "description": "[medium, high] changed-file thresholds; a per-repo value may only be lower (loader check)."
+                  "description": "[medium, high] changed-file thresholds; a per-repo value may only be lower elementwise (loader check)."
                 },
                 "sensitive_globs": {
                   "type": "array",
@@ -612,17 +656,9 @@
                   "default": [],
                   "description": "Paths that make a round at least tier 2; per-repo values add."
                 },
-                "trusted_authors": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/$defs/login"
-                  },
-                  "uniqueItems": true,
-                  "default": []
-                },
                 "allow_forks": {
-                  "type": "boolean",
-                  "default": true
+                  "const": false,
+                  "description": "A per-repo value may only be false."
                 }
               },
               "additionalProperties": false
@@ -676,6 +712,15 @@
                   "type": "string",
                   "pattern": "^[A-Za-z0-9._:-]{1,64}$",
                   "default": "review-approve"
+                },
+                "paths": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/glob"
+                  },
+                  "uniqueItems": true,
+                  "default": [],
+                  "description": "An automatic approve requires every changed path (and previous_path) to match; empty means no automatic approve in this repo."
                 }
               },
               "additionalProperties": false
@@ -720,8 +765,8 @@
       "type": "string",
       "minLength": 1,
       "maxLength": 512,
-      "pattern": "^[A-Za-z0-9._*/:@+-]+$",
-      "description": "A repo-id or path glob (* within a segment, ** across segments)."
+      "pattern": "^[A-Za-z0-9._*?/:@+-]+$",
+      "description": "A repo-id or path glob (Path matching in docs/interface.md: * and ? within a segment, a ** segment across directories)."
     },
     "login": {
       "type": "string",
@@ -729,6 +774,13 @@
       "maxLength": 256,
       "pattern": "^[A-Za-z0-9._@-]+$",
       "description": "An account login."
+    },
+    "account_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9:/_=.+-]{0,127}$",
+      "description": "A host account id as forgectl reports it."
     }
   }
 }

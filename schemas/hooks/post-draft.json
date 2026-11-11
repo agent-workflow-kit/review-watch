@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "review-watch/hooks/post-draft.json",
   "title": "post-draft hook payload (stdin)",
-  "description": "A round reached drafted. Post hook: runs after the transition committed, at most once. No draft text.",
+  "description": "A round reached drafted. Post hook: fired from the transition's outbox, whoever finalized, at least once (deduplicate by event_id). Gate decisions are read with show. No draft text.",
   "type": "object",
   "properties": {
     "tool": {
@@ -27,8 +27,8 @@
     },
     "event_id": {
       "type": "string",
-      "pattern": "^(?:rw-[a-z2-7]{8}(?:#[0-9]+)?|[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*(?::[0-9]{1,5})?)-(?:post-draft|post-attention)-[0-9]+$",
-      "description": "<id>-<hook>-<n>, the deduplication key."
+      "pattern": "^(?:rw-[a-z2-7]{8}(?:#[0-9]+)?|[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*(?::[0-9]{1,5})?)-(?:post-draft|post-attention|post-post)-[0-9]+$",
+      "description": "<object id>-<hook>-<n>, the deduplication key (n is the cause's sequence)."
     },
     "pr": {
       "$ref": "../defs.json#/$defs/pr"
@@ -78,45 +78,6 @@
           "type": "null"
         }
       ]
-    },
-    "auto_blocked_by": {
-      "type": "array",
-      "items": {
-        "$ref": "../defs.json#/$defs/auto_blocked_code"
-      },
-      "uniqueItems": true
-    },
-    "post_gate_decision": {
-      "oneOf": [
-        {
-          "$ref": "../defs.json#/$defs/gate_decision"
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
-    "post_gate_enforced": {
-      "type": [
-        "boolean",
-        "null"
-      ]
-    },
-    "approve_gate_decision": {
-      "oneOf": [
-        {
-          "$ref": "../defs.json#/$defs/gate_decision"
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
-    "approve_gate_enforced": {
-      "type": [
-        "boolean",
-        "null"
-      ]
     }
   },
   "additionalProperties": false,
@@ -136,12 +97,7 @@
     "tier",
     "verdict",
     "severity_counts",
-    "coverage_status",
-    "auto_blocked_by",
-    "post_gate_decision",
-    "post_gate_enforced",
-    "approve_gate_decision",
-    "approve_gate_enforced"
+    "coverage_status"
   ],
   "allOf": [
     {

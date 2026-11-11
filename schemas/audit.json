@@ -74,6 +74,17 @@
             "boolean"
           ],
           "maxLength": 64
+        },
+        "actor_source": {
+          "enum": [
+            "flag",
+            "tty",
+            "default"
+          ],
+          "description": "flag: an explicit --actor; tty: the default human actor on a TTY; default: auto:unknown."
+        },
+        "stdin_tty": {
+          "type": "boolean"
         }
       },
       "additionalProperties": false,
