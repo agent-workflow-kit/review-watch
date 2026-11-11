@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review-watch/cli/browse-result.json",
+  "title": "browse --result-file",
+  "description": "Written only on exit 0. intent: open (the parent should open selected), back (the user left without choosing) or done (the user quit after acting). done lists the actions taken inside the TUI; target is an item or round id.",
+  "type": "object",
+  "properties": {
+    "intent": {
+      "enum": [
+        "open",
+        "back",
+        "done"
+      ]
+    },
+    "selected": {
+      "type": "array",
+      "items": {
+        "anyOf": [
+          {
+            "$ref": "../defs.json#/$defs/item_id"
+          },
+          {
+            "$ref": "../defs.json#/$defs/round_id"
+          }
+        ]
+      }
+    },
+    "done": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "enum": [
+              "accept",
+              "edit",
+              "reject",
+              "rerun",
+              "resume"
+            ]
+          },
+          "target": {
+            "anyOf": [
+              {
+                "$ref": "../defs.json#/$defs/item_id"
+              },
+              {
+                "$ref": "../defs.json#/$defs/round_id"
+              }
+            ]
+          },
+          "exit_code": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "action",
+          "target",
+          "exit_code"
+        ]
+      }
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "intent",
+    "selected",
+    "done"
+  ]
+}

@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review-watch/hooks/pre-round.json",
+  "title": "pre-round hook payload (stdin)",
+  "description": "Runs once per round, at creation, after the scope, skip and cap checks and before capacity. Exit 13 escalates, any other non-zero exit vetoes (recorded as a skip with skip_reason hook_veto). Not delivered later, so it has no event_id. No PR text.",
+  "type": "object",
+  "properties": {
+    "tool": {
+      "const": "review-watch"
+    },
+    "hook": {
+      "const": "pre-round"
+    },
+    "object_type": {
+      "const": "round"
+    },
+    "object_id": {
+      "$ref": "../defs.json#/$defs/round_id"
+    },
+    "repo": {
+      "$ref": "../defs.json#/$defs/repo_id"
+    },
+    "labels": {
+      "$ref": "../defs.json#/$defs/labels",
+      "maxItems": 3,
+      "description": "rw-item, rw-round and pr as key=value strings."
+    },
+    "pr": {
+      "$ref": "../defs.json#/$defs/pr"
+    },
+    "item": {
+      "$ref": "../defs.json#/$defs/item_id"
+    },
+    "n": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "The number the round will get."
+    },
+    "head_sha": {
+      "$ref": "../defs.json#/$defs/sha"
+    },
+    "tier": {
+      "$ref": "../defs.json#/$defs/tier"
+    },
+    "tier_reasons": {
+      "type": "array",
+      "items": {
+        "$ref": "../defs.json#/$defs/tier_reason"
+      },
+      "uniqueItems": true
+    },
+    "trigger": {
+      "$ref": "../defs.json#/$defs/trigger"
+    },
+    "forced": {
+      "type": "boolean"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "tool",
+    "hook",
+    "object_type",
+    "object_id",
+    "repo",
+    "labels",
+    "pr",
+    "item",
+    "n",
+    "head_sha",
+    "tier",
+    "tier_reasons",
+    "trigger",
+    "forced"
+  ],
+  "allOf": [
+    {
+      "properties": {
+        "labels": {
+          "contains": {
+            "type": "string",
+            "pattern": "^rw-item=rw-[a-z2-7]{8}$"
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "labels": {
+          "contains": {
+            "type": "string",
+            "pattern": "^rw-round=[0-9]+$"
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "labels": {
+          "contains": {
+            "type": "string",
+            "pattern": "^pr=[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*(?::[0-9]{1,5})?(?:/(?!\\.\\.?(?:/|#))[A-Za-z0-9._-]+)+#[1-9][0-9]{0,9}$"
+          }
+        }
+      }
+    }
+  ]
+}

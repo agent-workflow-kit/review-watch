@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review-watch/cli/show.json",
+  "title": "show --json",
+  "description": "The item and the selected round (null for an item with no round), its revisions, hook records and the commands now possible.",
+  "type": "object",
+  "properties": {
+    "item": {
+      "$ref": "../defs.json#/$defs/item"
+    },
+    "round": {
+      "oneOf": [
+        {
+          "$ref": "../defs.json#/$defs/round"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "revisions": {
+      "type": "array",
+      "items": {
+        "$ref": "../defs.json#/$defs/revision"
+      }
+    },
+    "hooks": {
+      "type": "array",
+      "items": {
+        "$ref": "../defs.json#/$defs/hook_record"
+      }
+    },
+    "next_actions": {
+      "type": "array",
+      "items": {
+        "$ref": "../defs.json#/$defs/next_action"
+      },
+      "uniqueItems": true
+    },
+    "finalize": {
+      "enum": [
+        "done",
+        "busy",
+        "skipped",
+        null
+      ],
+      "description": "done: finalize ran; busy: the round's lease is held and the stored row is printed; skipped: nothing to finalize or --no-refresh; null: no round."
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "item",
+    "round",
+    "revisions",
+    "hooks",
+    "next_actions",
+    "finalize"
+  ]
+}

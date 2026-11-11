@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review-watch/cli/cron-install.json",
+  "title": "cron install --json",
+  "description": "block is the managed block as a list of lines, as written (or that would be written). replaced is true when an existing block was replaced.",
+  "type": "object",
+  "properties": {
+    "action": {
+      "const": "install"
+    },
+    "dry_run": {
+      "type": "boolean"
+    },
+    "changed": {
+      "type": "boolean"
+    },
+    "replaced": {
+      "type": "boolean"
+    },
+    "block": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 4096
+          },
+          "maxItems": 16
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "stray_poll_line"
+        ]
+      },
+      "uniqueItems": true
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "action",
+    "dry_run",
+    "changed",
+    "replaced",
+    "block",
+    "warnings"
+  ]
+}

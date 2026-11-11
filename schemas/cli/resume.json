@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review-watch/cli/resume.json",
+  "title": "resume --json",
+  "description": "kind says what was continued: a session escalation (review-run resume --no-wait), a pre-run escalation (a fresh launch with an override) or a pre-round hold.",
+  "type": "object",
+  "properties": {
+    "round": {
+      "$ref": "../defs.json#/$defs/round"
+    },
+    "run_id": {
+      "oneOf": [
+        {
+          "$ref": "../defs.json#/$defs/run_id"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "kind": {
+      "enum": [
+        "session",
+        "pre_run",
+        "pre_round"
+      ]
+    },
+    "dry_run": {
+      "type": "boolean"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "round",
+    "run_id",
+    "kind",
+    "dry_run"
+  ]
+}

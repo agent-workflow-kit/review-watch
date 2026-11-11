@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review-watch/cli/accept-dry-run.json",
+  "title": "accept --dry-run --json",
+  "description": "Exit 0 prints the plan and plan_sha256. A refused dry run prints only the error envelope (cli/error.json).",
+  "type": "object",
+  "properties": {
+    "dry_run": {
+      "const": true
+    },
+    "round": {
+      "$ref": "../defs.json#/$defs/round_id"
+    },
+    "approve": {
+      "type": "boolean"
+    },
+    "origin": {
+      "enum": [
+        "human",
+        "automatic_intent"
+      ]
+    },
+    "plan": {
+      "type": "object",
+      "properties": {
+        "plan_sha256": {
+          "$ref": "../defs.json#/$defs/sha256"
+        }
+      },
+      "required": [
+        "plan_sha256"
+      ],
+      "additionalProperties": true,
+      "x-untrusted": true,
+      "description": "pr-comment's dry-run result (findings, moved, unanchored, neutralized counts, footer); untrusted, only plan_sha256 is relied on."
+    },
+    "plan_sha256": {
+      "$ref": "../defs.json#/$defs/sha256"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "dry_run",
+    "round",
+    "approve",
+    "origin",
+    "plan",
+    "plan_sha256"
+  ]
+}

@@ -1,101 +1,156 @@
 # review-watch: design
 
-Status: Seeded from awkit architecture v1.4; not yet designed.
-
-Section references (§N) point to `../awkit-docs/architecture.md` unless marked "design guide" (`../awkit-docs/design-guide.md`).
+Status: designed, 2026-11-11 (interface 0.1.0-design). The rules are in [interface.md](interface.md), the single normative source; this document records the decisions, the structure and the test strategy and links to the headings there instead of restating them. Section references (§N) point to `../awkit-docs/architecture.md`, and "design guide" to `../awkit-docs/design-guide.md`.
 
 ## Role and layer
 
-Run reviews on incoming review requests unattended, as drafts you accept.
-
-Layer 3 (workflow). Must work fully standalone; no upward awareness.
-
-## Responsibilities
-
-From §5.3 (`review-watch`), verbatim:
-
-Watches for review requests, runs reviews unattended and holds each result as a draft you accept.
-
-- Commands: `poll`, `list`, `show <id>` (a queue item), `accept <id> [--reanchor|--dry-run]`, `reject <id>`, `rerun <id>`, `status` (summary of the queue and today's runs, plus gate track records from `gatectl stats` when gatectl is configured), `logs <id>` (run log), `browse`.
-- Uses: forgectl, review-run, pr-comment; optionally pr-watch, gatectl and jobsctl.
-- Notes:
-  - The behaviors below (direct-request trigger, skips, risk tiers, shadow mode, staleness, round limit) are generic design decisions of this project; prior art is cited in review-watch's design doc.
-  - Considers only PRs that request your review directly; team-level requests are ignored. Skips draft PRs, bot-authored PRs and PRs you already reviewed yourself (a review by your own account carrying the `<!-- pr-comment:v1 -->` marker was posted through awkit and does not count).
-  - Keys its queue items on (PR, head sha, review-request instance) and enqueues only for a new item. It runs `review-run run <pr> --label rw-item=<id>` via jobsctl (queue `reviews`, `--unique-key review:<pr>@<sha>` as a second safety net) or, without jobsctl, as detached processes; `poll` never blocks on a review. `poll` resolves held review jobs once the run is done or failed, or the item is rejected.
-  - Copies the review-run artifact into its own review draft, which is the editable, authoritative copy for posting. Marks review drafts stale when the head moves; `accept --reanchor` re-anchors through `pr-comment review --reanchor-to <sha>`. `accept` is a human action and passes `--yes --actor human:<user>` to pr-comment.
-  - New commits never start a review on their own; a fresh review request or an explicit `rerun` does, up to a configurable per-PR round limit.
-  - **Risk tier** is computed deterministically from PR facts (paths, size, author, repo rules, CI); model output can move a PR to a stricter tier, never a looser one. Auto-post and auto-approve go through gatectl (shadow first, section 12.3); an auto-approve policy must include a script check that ignores model output. It passes `--approve` to pr-comment only when an enforced auto-approve gate allows and the hard rules pass.
-  - **Built-in hard rules** (the public minimum, applied regardless of gate decisions): never auto-approve your own PRs or bot PRs; never auto-post or auto-approve unless CI has passed on the PR's current head; never auto-act on a PR that touches an off-limits path (a configurable glob list whose default covers security-sensitive code, CI and build pipeline definitions, agent configuration and instruction files, and review-ownership files).
-  - **Gate outcomes:** when you act on a gated item, it records `gatectl outcome <id> agree` if your action matches the gate's (would-be) decision and `disagree` otherwise (e.g. the gate would auto-post and you edit or reject the draft).
-  - Has an internal concurrency cap so it works without jobsctl; its built-in hard rules let it work without gatectl. Optional daily spend cap, off by default (section 20).
-  - Hooks (indicative): `post-draft`, `post-pending`.
+Layer 3 (workflow). Finds the PRs that ask you to review them by name, runs a review on each through review-run and holds the result as a draft you accept. Works fully standalone (architecture C2): it needs forgectl, review-run and pr-comment, and optionally gatectl and jobsctl. Without jobsctl, `poll` starts each review itself with `review-run run --no-wait --json` as a bounded call; no review process is ever detached. The harness and any other caller are unknown to it; behavior differs only by explicit arguments. It is shareable (architecture C4): no tmux and no notifier is needed, and macOS is supported.
 
 ## Uses
 
-- `forgectl` (lists review requests and PR facts); binding: TBD (A/B/C), decided in this tool's design session
-- `review-run` (runs reviews); binding: TBD (A/B/C), decided in this tool's design session
-- `pr-comment` (posts accepted reviews; re-anchoring); binding: TBD (A/B/C), decided in this tool's design session
-- `pr-watch` (optional); binding: TBD (A/B/C), decided in this tool's design session
-- `gatectl` (optional: auto-post / auto-approve policies); binding: TBD (A/B/C), decided in this tool's design session
-- `jobsctl` (optional: review job queue); binding: TBD (A/B/C), decided in this tool's design session
+| Tool | Binding | What for |
+|---|---|---|
+| forgectl | A (hard) | `prs --review-requested-from me`, `snapshot`, `show`, `files` (the gate's tier binds to the draft's head through it), `whoami` (read-only, `--json`); the minimum version is a constant of the release |
+| review-run | A (hard) | `run --no-wait --json`, `resume --no-wait` (always with `--prompt-file`, for a session escalation), `cancel`, `list --label` and `--pr`, `show` (plain, so it refreshes and finalizes; `--no-refresh` only for `logs --run` and the `--previous` existence check); the minimum version is the first release with `list --label`, `show`, `cancel`, `resume --no-wait` and `run --no-wait` |
+| pr-comment | A (hard) | `draft check`, `review` (`--dry-run`, `--expected-head`, `--reanchor-to`, `--expect-plan`, `--approve`; there is no `--expected-base`, the base is pinned by the anchor) |
+| gatectl | A (optional) | `check` (`--actor`, `--timeout` in seconds), `outcome`, `stats`; without it nothing is ever automatic |
+| jobsctl | A (optional) | `add` (`--unique-key review:<round id>:<attempt>`, `--max-retries 0`, `--kill-grace`, `--cwd`), `capacity`, `show <job id>` (`show --unique-key` only to recover a job whose id was not stored), `resolve`, `cancel`; without it, `poll` runs `review-run run --no-wait --json` itself under an internal cap (no review process is detached) |
 
-## Key flow: §10.1 Review request (flow A, priority slice)
-
-Verbatim from the architecture:
-
-0. When jobsctl is used, `jobsctl run` runs from cron (or as a loop).
-1. Cron runs `review-watch poll`.
-2. forgectl lists PRs that request your review directly; draft PRs, bot-authored PRs and PRs you already reviewed yourself are skipped.
-3. For each new queue item (PR, head sha, review-request instance), review-watch enqueues a jobsctl job (queue `reviews`, `--unique-key review:<pr>@<sha>`) or, without jobsctl, spawns a detached process under its internal cap, running `review-run run <pr> --mode headless --label rw-item=<id>`.
-4. review-run pre-fetches diff and metadata into a fenced prompt file. If `run_pr_code: true`, it first runs the throwaway-checkout sequence of section 13.2 rule 9 and appends the fenced command output to that file. It then calls `agent-spawn launch --mode headless --kind review --cwd session-dir --skill review-run:review-pr --plugin-dir <bundled> --worktree none --prompt-file <file> --permission-profile <bundled file> --env-allowlist-only <vars> --label owner=review-run --wait` (section 13.1). The session never has a checkout.
-5. The session reports done with the review artifact. review-run validates it against the review-draft schema, stores the run with its own copy of the artifact, and tears down the agent; review-watch copies the artifact into its review draft; its `post-draft` hook calls notice-route (Slack/Home Assistant).
-6. You accept (CLI or TUI). If the head moved, the review draft is stale (`rerun`, or `accept --reanchor` to re-anchor onto the new head via pr-comment). Otherwise pr-comment posts one review (COMMENT, or REQUEST_CHANGES per the draft) with inline comments and an attribution footer, and records an audit entry.
-7. Optional: gatectl decides auto-post / auto-approve, in shadow mode first, within the hard rules (section 5.3).
-8. A new review starts only on a fresh review request or an explicit `rerun`, up to the configured per-PR round limit.
-9. If the review session escalates, the run is `escalated`, its job is held and its agent is kept. Once the agent is resumed and the run is done or failed (or the item is rejected), `poll` resolves the held job.
-
-## Relevant cross-cutting sections
-
-- §3.2, §3.3: layering rules and edge bindings
-- §9.3: post-exit policies and held jobs
-- §10.1: review request flow (flow A)
-- §10.4: attention and notifications (flow D)
-- §12: autonomy and gates: public defaults (§12.1), gates and shadow mode (§12.3), confirmations and `--yes` (§12.4)
-- §13.2: prompt injection: fencing, transport, trust tiers
-- §14: audit, attribution footers and the `<!-- pr-comment:v1 -->` marker
-- §15: notifications (`post-draft`, `post-pending`)
-- design guide §4.3, §4.4, §10, §12: concurrency and cron; confirmations; TUI; safety
-
-## Constraints (decided)
-
-From §20 (`review-watch`):
-
-queue items are keyed on (PR, head sha, review-request instance). The spend cap uses the local timezone; spend is the sum of headless `total_cost_usd`; promoted interactive time is not counted.
-
-## Open topics
-
-From §20 (`review-watch`):
-
-review state machine (queued → running → drafted → posting → posted → closed, plus failed), risk tier rules, rounds, staleness, shadow mode, config.
+pr-watch is not a dependency (D-9). Third parties: none directly; `$VISUAL` or `$EDITOR` for `edit`. The package's own dependencies are `pyyaml` (the stdlib cannot read YAML) and `pydantic` (config validation), as the design guide prescribes, plus `textual` as an optional extra (`review-watch[tui]`, imported only by `browse`; without it `browse` exits 12 `tool_missing`); everything else is the standard library (`argparse`, `sqlite3`, `subprocess`, `json`, `os`, `shlex`). Path globs use a small segment matcher in `tiers`, not `fnmatch` ([Path matching](interface.md#path-matching)).
 
 ## Decisions
 
-| Decision | Rationale | Date |
+| ID | Decision | Rationale | Interface |
+|---|---|---|---|
+| D-1 | Two objects: an item per review request, keyed by `(pr_id, reviewer, instance)`, and a round per review at one head (an item has at most one non-terminal round); the head sha belongs to the round; items close from any state (a merged or closed PR closes a `failed` or `rejected` item too) and a reopened PR reopens its item without a round | A new head under one instance must not start a review (§5.3), yet drafts, runs and staleness are per head; history is kept without overwriting drafts; no item may stay live after its PR is gone | [Identifiers](interface.md#identifiers), [Round states](interface.md#round-states), [Item transitions](interface.md#item-transitions) |
+| D-2 | A round counts toward the per-PR cap once its session was launched, and while it is non-terminal and has not failed before a session (so two rounds created in one cycle cannot pass the cap); a failure before any session frees the slot; the cap binds automatic starts and `rerun`; only a human `--force` or a config change passes it | Matches the architecture wording and review-respond's `max_rounds`; a veto or a missing tool must not use up rounds | [Creating a round](interface.md#creating-a-round), [Run outcomes](interface.md#run-outcomes) |
+| D-3 | Hosts are named in config (no default); optional repo globs narrow it; requests out of scope are not recorded | Cost and exposure are bounded by the hosts the user chose; the review itself is sandboxed by review-run | [Scope](interface.md#scope) |
+| D-4 | The tier is the maximum over independent deterministic rules; unknown facts give tier 3; model output can only raise it; the gate's tier is computed at `drafted` from facts bound to the draft's head (the creation-time tier serves only the `pre-round` payload and display); it feeds the gate input and two built-in limits | Explainable, golden-testable, safe by default (§5.3: a null size is the largest tier); a push between creation and the session must not let stale facts act | [Risk tiers](interface.md#risk-tiers), [Fact binding](interface.md#fact-binding) |
+| D-5 | `poll` re-reads each non-terminal round's PR (one `show`) and marks a drafted round stale on a head or base change; `accept` always re-reads live, pins the head with `--expected-head` and the base through pr-comment's pin on the draft's anchor plus its own live check | One cheap read per open round; the live check is the safety net, the flag is only information | [Staleness](interface.md#staleness) |
+| D-6 | Automatic actions run in one order: fact binding and hard rules, the post gate, the approve gate whenever the post gate's decision is `allow` (also in shadow, so its track record builds), facts and hard rules checked again after the gate, then one `pr-comment review --dry-run` and `--yes --expect-plan` with the final flags, all in one cycle. One gate call per round per policy with a closed declared-field input (`event` and `verdict` included); only `enforced: true`, `allow`, a `decision_id` and no warning acts; a gate error allows three calls in all and is then left to the human. Extra hard rules: an edited draft, a draft whose `event` is not `comment`, a repo that was renamed, and, for approve, a findings set with a blocker, a major or an unspecified finding, or skipped coverage, every changed path under the repo's `auto_approve.paths` and an author id in `auto_approve.trusted_author_ids`. Outcomes are filed per gate from the human's accept (with `--approve` for the approve gate) or reject; none for re-anchored or automatic posts | §12.3 and the gatectl carry-forwards; an automatic `agree` never counts; automatic approve must not rest on a denylist alone or on a login that can be re-registered | [Automatic actions](interface.md#automatic-actions), [Hard rules](interface.md#hard-rules), [Gate outcomes](interface.md#gate-outcomes) |
+| D-7 | The job is `review-run run` itself, with no wrapper, `--json` always, keyed `review:<round id>:<attempt>` with jobsctl (one key per launch); without jobsctl `poll` runs `review-run run --no-wait --json` as a bounded call and reads the envelope (no review process is detached); `poll`, `show` and `accept` finalize through a refreshing `review-run show` under a per-round lease; `review-run list --label` finds an existing run before any submission, and a `queued` round adopts a run found by its labels; a retry stays non-terminal (`running` to `queued` with `retry_wait`, never through `failed`) and counts launches against `max_attempts` | A dead job or `poll` loses nothing: review-run's own record is the truth; review-run does not dedupe `run`; the inline envelope tells a veto or an escalation from a failure, which a lost process could not; a key per launch cannot adopt another launch's or another round's job | [Launch](interface.md#launch), [Finalize](interface.md#finalize), [Run outcomes](interface.md#run-outcomes) |
+| D-8 | An `escalated` round state with `resume` and `reject` as human actions; `resume` changes state only and `poll` launches: a session escalation goes to `review-run resume --no-wait` (a prompt file is required), a `pre_run` escalation queues the round with the human's override and the next `poll` launches it once, and a `held` round has its `pre-round` hooks re-run with the override; held jobs are resolved by `poll`; no automatic resume | §10.1 step 9; escalation always goes to the human | [`resume`](interface.md#resume), [Finalize](interface.md#finalize) |
+| D-9 | pr-watch is dropped from the Uses list | Its only query watch is `--mine --open`, it emits no event for a review request, and `poll` re-reads drafted rounds itself; a user may wire its hooks to `review-watch poll` | [Detection and the poll cycle](interface.md#detection-and-the-poll-cycle) |
+| D-10 | Skipped requests are stored and re-evaluated; permanent skips (`bot_author`, `bot_unknown`, `own_pr`) are never re-read and new requests are snapshotted first, within `poll.max_snapshots` per host and cycle; a request from an author who is not known to belong (GitHub `author_association` other than owner, member or collaborator, a GitLab fork head, and not a trusted author) is skipped `author_external` and only a human `rerun` starts it (it is re-read only when its listing values change, never by the hourly recheck, so an outside account cannot make review-watch's snapshot load grow without bound), unless the global `start.external_authors: review` restores starting every request; team-level requests are never seen; out-of-scope requests are counted only | `list` and `status` can explain why a PR got no review; a draft PR made ready starts without a new request; finished GitLab requests must not starve a new one; CODEOWNERS requests every owner on every PR, so an anonymous account must not be able to start sessions by opening PRs | [Skip rules](interface.md#skip-rules), [Snapshot selection](interface.md#snapshot-selection) |
+| D-11 | `edit` (drafts only) keeps revisions with hashes and the `edited` flag (never cleared once a human revision differs from its base; a re-anchor never sets it); `accept` shows pr-comment's exact plan with every posted string in full (the human sees what is posted) and binds the post to its `plan_sha256`; no pending store | The `edited` flag decides the gate outcome and makes the round never automatic; the exact-plan guarantee comes from pr-comment; without a pending store a non-human `accept` exits 13 and records nothing | [`edit`](interface.md#edit), [`accept`](interface.md#accept), [Human-only actions](interface.md#human-only-actions) |
+| D-12 | Hooks: `pre-round` (runs once per round, at creation), `post-draft`, `post-attention` (one hook, a closed `reason` list), `post-post`; no `post-pending`. A `pre-round` veto is recorded as a skip (`hook_veto`) and re-asked only on a new head or `rerun`; an escalation holds the round, and `resume` is the one continuation for every hold. Post hooks are delivered at least once with `event_id` | Design guide section 8 reserves `post-pending` for a tool with a pending store; one attention hook keeps wiring to a notifier simple; a held round must not be re-asked every cycle | [Hooks](interface.md#hooks), [Attention reasons](interface.md#attention-reasons) |
+| D-13 | `poll` is isolated per host, item and round; exit 0 for a completed cycle even with errors, 12 only when the cycle could not run or every host failed; a persistent host failure raises `post-attention` | Cron should not flood on transient errors; absence in a failed listing means nothing | [Detection and the poll cycle](interface.md#detection-and-the-poll-cycle) |
+| D-14 | State in `state.db` (drafts as blobs with hashes), a public `log.jsonl`, an `audit.jsonl` of external actions and human decisions (every `reject` included); no PR title or body is stored; `prune` deletes only items of closed or merged PRs and for other terminal items drops old draft revisions only, so a rejection and the round count survive; logs are pruned after `retention.log`, the audit never | The audit covers the decisions that feed the gate's track record; untrusted text is not kept; forgetting an item of an open PR would start a review again | [Audit and log](interface.md#audit-and-log), [Files](interface.md#files), [`prune`](interface.md#prune) |
+| D-15 | No `reconcile` command: `poll` repairs state against reality | A second repair path would only duplicate it (pr-watch pass 2 reached the same result) | [Commands](interface.md#commands) |
+| D-16 | No dollar cap in 0.x. `limits.rounds_per_day` (default 50, `null` off) is checked at submission, never at creation: a round counts once, at its first launch on the current local day (a retry and a `resume` relaunch do not); at the limit rounds stay `queued` (`daily_limit`) and are submitted oldest first, `post-attention` fires once per day and `rerun --force` makes one round exempt. A dollar cap is deferred to a 1.x release that follows review-run reporting `cost_usd` | review-run reports no cost today, so a dollar cap would be dead code; a count bounds request spam without another tool | [Daily limit](interface.md#daily-limit) |
+| D-17 | Safety settings (tiers, caps, `max_*_tier`, `auto_*`, `gate.*`, `limits.*`) cannot be set from the environment; in a per-repo override they may only be stricter than the global value (`allow_forks` only `false`; `include` and `exclude` are global only; `trusted_authors` and `trusted_author_ids` are global only; `start.external_authors` is global only); off-limits and sensitive lists add and never remove; `auto_approve.enabled` needs `auto_post.enabled` | A repo entry must not weaken a global safety setting silently (design guide section 5 precedence puts repo above env on purpose) | [Config](interface.md#config), [Config validation](interface.md#config-validation) |
+| D-18 | `posting` stores its intent with an `attempts` counter and `call_started_at`; a result that could have landed keeps `posting` and, once uncertain (also a round found with no holder after a started call), a round can only end `posted`, `rejected` or `closed`; only the first call's own definitive refusal clears the intent; no write starts while the previous one may still run (630 s after `call_started_at`, and a holder that loses its lease kills its child); a human completion posts as the human and a completion of an automatic `approve` intent is labeled as such and needs the interactive prompt; an automatic post that lands with a warning raises `post_failed` | A retry must be the same post, a result that could have landed keeps `posting` (the default is uncertain), and every pr-comment exit that wrote nothing returns the draft to the human; a crash must not turn a landed post into "nothing landed"; pr-comment's dedupe does not cover two simultaneous runs; an approve intent never retries onto a head no one reviewed, and a human must see that a completion approves; an approval on an unreviewed head or a neutralization miss in an unread automatic post must not be silent | [Post intent and recovery](interface.md#post-intent-and-recovery) |
+| D-19 | One table maps review-run's answer to the round: a run found by its labels, the inline envelope or, with jobsctl, the job read by its stored id; a veto, an escalation and a failure before any run exist are told apart | A lost process would turn every one of them into `no_run` and burn `max_attempts`; a `pre-run` hold could never be resumed; an environmental failure never fails a round | [Run outcomes](interface.md#run-outcomes) |
+| D-20 | `pre-round` once per round, a veto is a skip, `resume` is the one continuation; a veto during `resume` of a held round exits 11 and leaves it held | A held or waiting round must not be re-asked every cycle, and one way to continue is easier to learn than two | [Hooks](interface.md#hooks), [`resume`](interface.md#resume) |
+| D-21 | One path matcher (one meaning for `**`, patterns validated at load, the vetoes compared with ASCII case folding and the `auto_approve.paths` allowlist exact, renames tested on both paths, a quoted or malformed path failing closed, only letters, digits and `. _ * ? / : @ + -` allowed in a pattern so no bracket class can diverge from the spec, the nested editor, agent and hook directories of the default `off_limits` any-depth) and facts bound to the draft's head (`forgectl show`, `snapshot` and `files` at the anchor) | `fnmatch` lets `*` cross `/`, treats `[` as a class and misses depth; a tier from creation time can describe a different head than the one acted on | [Path matching](interface.md#path-matching), [Fact binding](interface.md#fact-binding) |
+| D-22 | `prune` never forgets an item of an open PR | The request key, the round count for `max_rounds` and a rejection must survive, or the next poll starts the review again | [`prune`](interface.md#prune) |
+
+## Resolved open topics
+
+The six open topics of the seed and architecture §20 are resolved as follows: the **state machine** in [Items, rounds and states](interface.md#items-rounds-and-states) (D-1); **risk tier rules** in [Risk tiers](interface.md#risk-tiers) (D-4); **rounds** in [Creating a round](interface.md#creating-a-round) (D-2); **staleness** in [Staleness](interface.md#staleness) (D-5); **shadow mode and track records** in [Automatic actions](interface.md#automatic-actions) and `status` (D-6); and the **config shape** in [Config](interface.md#config) (D-3, D-17).
+
+## Not in 0.1
+
+Candidates for 1.x, each additive: an early-poll trigger when a pr-watch hook is wired (a documented recipe is all 0.1 has); team-level request discovery (forgectl has no listing, and a per-repo scan would be costly); approving an already posted draft through review-watch (today a human runs `pr-comment approve`); a revert detector feeding `gatectl outcome --signal revert`; a dollar spend cap once review-run reports `cost_usd` (cross-tool issue filed; 0.x has the daily round limit); per-author rules; interactive review mode; notification text templates; a learned risk score (the prior art describes one; this tool does not implement it); a `doctor`-style readiness command (review-run's `run --dry-run` serves for now).
+
+## Live verification
+
+No third-party behavior is wrapped directly: git-host behavior is forgectl's, and the session is review-run's. The behaviors review-watch relies on were verified in those tools' sessions (forgectl spikes A to F, pr-watch spikes A to C, review-run spikes A to C, gatectl spikes A, A2 and B). No new spike was run in this session (the user agreed); every sibling is still unimplemented, so there is nothing real to run against. The behaviors below become `live` tests, and the unverifiable ones keep a conservative default.
+
+| Behavior | Source | Test or default |
 |---|---|---|
+| `prs --review-requested-from me` lists direct requests only; GitLab also lists finished requests | forgectl interface | live test on both hosts; every candidate is snapshotted (default) |
+| A re-request is a new `instance`; a push is not; a null instance starts once; on GitHub a re-request of a `posted` item lists the request again, often with a null or unchanged instance | forgectl CF-2 | live test on GitHub and GitLab; null keeps the one-start rule and a request outstanding again after the post adds a `re_request` round |
+| `review-run run` exits 13 in two shapes; an escalated run is continued by `resume` | review-run interface | live test with a real escalation |
+| `review-run run --no-wait --json` returns after the agent id is stored, or with the error envelope (exits 2, 10, 11, 12, 13, 20) before any run exists | review-run interface | live test; a `pre-run` veto and escalation, under jobsctl and inline, map to `failed` `pre_run_vetoed` and `escalated` (`pre_run`) |
+| A jobsctl job whose command exits 13 is `held` and `resolve` ends it | jobsctl interface | live test |
+| `gatectl check` with a declared head returns `enforced`, `decision`, a `decision_id` and `warnings`; `--timeout` takes whole seconds | gatectl interface | live test; a missing id or any warning means no automatic action |
+| `pr-comment review --dry-run` then `--expect-plan` posts exactly the previewed plan | pr-comment interface | live test on both hosts |
+| A GitLab re-request of the same reviewer set: the request `state` goes back to `outstanding`, no new note, so no new `instance` | forgectl interface | live test on GitLab; the `re_request` trigger is the default reading |
+| Cron block parsing with and without the end line | pr-watch and gatectl precedent | golden test; macOS checklist |
+| The editor round trip (`$EDITOR`, `$VISUAL`) in a TTY and in the TUI | this tool | process test with a fake editor; macOS checklist |
 
-## Questions for the design session
+## Modules
 
-1. What is the review state machine (queued → running → drafted → posting → posted → closed, plus failed), including transitions and persistence?
-2. What are the risk tier rules, and which PR facts feed them?
-3. What counts as a round, and how is the per-PR limit applied?
-4. How is staleness detected and surfaced?
-5. How does shadow mode work end to end, and how are gate track records surfaced in `status`?
-6. What is the config shape (repos, off-limits paths, caps, spend cap)?
+| Module | Responsibility |
+|---|---|
+| `cli` | `argparse` subcommands, exit codes, `--json` printing, the error envelope |
+| `config` | Pydantic models, drop-ins, precedence, per-repo overrides, the stricter-only rule |
+| `store` | SQLite access, migrations, leases with a heartbeat, compare-and-set transitions |
+| `discover` | host listing, snapshots, scope, identity, skip rules, item matching |
+| `tiers` | deterministic risk tiers, the path matcher, fact binding and the hard rules |
+| `rounds` | the state machine, caps, the daily limit, retries, staleness |
+| `launch` | jobsctl submission or inline `--no-wait` starts, capacity |
+| `finalize` | reading review-run, the run-outcomes table, copying drafts, resolving held jobs, cancel |
+| `gate` | gatectl calls, the declared input, gate records, outcomes |
+| `post` | edit revisions, accept, the post intent and its recovery, re-anchoring, pr-comment calls |
+| `hooks` | hook execution, payloads, outbox delivery |
+| `cron` | the cron block writer and parser |
+| `audit`, `log` | `audit.jsonl` and `log.jsonl` writers |
+| `sanitize` | the one output sanitizer |
+| `tui` | the optional Textual browser |
+| `gateway` | every subprocess call (forgectl, review-run, pr-comment, gatectl, jobsctl, the editor, crontab) with its fixed timeout, so tests can substitute fakes |
 
-## Prior art and references
+## Data model
 
-The risk-tier and shadow-mode ideas above are common practice; these public sources informed them. The values this tool ships with (round limit, caps, tier rules, off-limits globs, thresholds for recommending a gate) are its own conservative defaults and are expected to be tuned per user and per repo.
+Tables in `state.db` (additive migrations, schema version recorded): `items` (id, `pr_id`, `pr`, `repo`, reviewer id, `instance`, state, `skip_reason`, the last review-request state, `unreachable`, vetoed head and hook decision ids, seen times, `updated_at`), `prs` (`pr_id`, listed head, `draft`, `updated_at`, last listed time, so listing values are stored once per PR), `rounds` (id, item, `n`, state and reason fields, `rev`, head and base, one `tier` and reasons, run ids, job id, attempt, `not_before`, `launch_override`, `limit_exempt`, `escalations`, `last_failure`, `session_launched`, `escalation_kind`, gate records, flags, failure, `post_intent`, `post_error`, post result, timestamps), `revisions` (round, number, author, sha256, blob), `runs` (round, run id, attempt, state), `events` (the per-item log mirror, read by `logs`, and the hook outbox with `event_id` and a per-(object, hook) counter), `leases` (`poll`, per-round), `hosts` (consecutive failure count, last error, last alert). The public contracts are `log.jsonl` and `audit.jsonl`; `state.db` is private.
 
-- **Risk-stratified review automation.** Chris Adams et al., "Automating Low-Risk Code Review at Meta: RADAR, Risk Calibration, and Review Efficiency", arXiv:2605.30208 [cs.SE], 2026. <https://arxiv.org/abs/2605.30208>. Describes a staged funnel (eligibility gates, static heuristics, a learned diff risk score, LLM review, deterministic validation) that automates only low-risk changes and routes the rest to people, with a tunable risk threshold. This tool borrows the general shape: cheap deterministic checks first, model output that can only make the outcome stricter, and automation limited to the lowest tier. It does not implement a learned risk score.
-- **Change-level risk prediction.** Yasutaka Kamei et al., "A Large-Scale Empirical Study of Just-in-Time Quality Assurance", IEEE Transactions on Software Engineering 39(6), 2013. <https://doi.org/10.1109/TSE.2012.70>. Background for scoring a change from its own facts (size, files touched, history) rather than from the whole codebase.
-- **Shadow mode before enforcement.** Running a new decision path alongside the existing one and comparing results before it is allowed to act (often called a dark launch or shadow deployment) is general release practice; see Pete Hodgson, "Feature Toggles (aka Feature Flags)", martinfowler.com. <https://martinfowler.com/articles/feature-toggles.html>. Here the comparison is between a gate's would-be decision and what the user actually did (gatectl track records, §12.3).
+## Concurrency
+
+`poll` and each round take leases (holder PID plus process start time plus an expiry; the holder renews it from a heartbeat every 60 s for as long as it lives, including while a sibling call or a hook runs, and the expiry, 5 minutes after the last renewal, matters only when the holder died; a holder whose renewal fails stops at once, kills the process group of a `pr-comment` write in flight and writes nothing more, and the normal recovery finds what its call did), with the limits in [Timeouts and leases](interface.md#timeouts-and-leases). A command that fails to take a lease or loses a compare-and-set re-reads once and then exits 20 `round_busy`; nothing waits for a lease. `log.jsonl` appends and the `prune` rewrite share an `flock` on `log.lock`. Every state change is a compare-and-set on the round's `rev`, so `poll`, `show`, `accept`, `reject` and the TUI cannot both apply a transition. Hook delivery is an outbox written in the transition's transaction and delivered by the committing process; an undelivered event is redelivered by the next `poll`, so delivery is at least once and receivers deduplicate on `event_id`. Only an `async` hook entry is detached (and still bounded by its timeout); no process is identified by PID, and nothing is signaled: cancellation goes through `review-run cancel` and `jobsctl cancel`.
+
+## Error handling
+
+A failure on one object never stops another; nothing is changed because a read failed (Detection and the poll cycle). Lower tools' exits are mapped, not hidden: refusals pass through with `lower_tool`, `lower_code` and `lower_reason`; a vetoed or escalated `pr-comment` step surfaces as exit 11 or 13 with `escalated_by`. A malformed lower-tool output is `lower_contract_mismatch` (exit 12). An unexpected exception is exit 1 with a log record and never leaves a round in a state it cannot leave: a `posting` round keeps its stored intent and is resolved as [Post intent and recovery](interface.md#post-intent-and-recovery) says.
+
+## Test strategy
+
+All subprocess calls go through `gateway.py`; fakes for forgectl, review-run, pr-comment, gatectl and jobsctl live in `tests/fakebin/` (copied per repo, never shared) and are driven by pinned copies of the siblings' schemas in `tests/schemas/`. Golden files cover every `--json` output and hook payload, validated against `schemas/`. Process tests run real cron blocks and real SQLite against the fakes, and the fake review-run returns each run object and error envelope the run-outcomes table names. `live` tests (deselected by default, never in CI) cover the real round trip on both hosts, request-instance semantics, a real escalation, a `pre-run` veto and escalation, a held job, the gate flow in shadow, the editor round trip and the cron block; a macOS checklist covers the rest. Property tests cover the state machine (every transition is a compare-and-set, no terminal state changes and the loser of a race exits `round_busy` or re-evaluates to a valid refusal) and the tier function (an unknown fact never lowers a tier). Further tests: a crash after a started `pr-comment` call (the round is found uncertain and a later `stale_head` result does not clear the intent), no write inside the 630 s wait, a holder that loses its lease kills its child, an automatic post landing with each warning fires `post_failed` with that code, the completion of an automatic `approve` intent ignores `--yes`, no shadow decision id reaches pr-comment, `author_external` items are not rechecked hourly, `reject` of a permanent skip exits 20 `not_rejectable`, `prune` and a concurrent `log.jsonl` append lose no record, nested default `off_limits` paths match (`sub/.vscode/tasks.json`, `packages/a/.cursor/rules/x.mdc`) and a pattern with `[`, `]`, `{`, `}` or a backslash is refused at load. A test asserts that every enum list in the prose equals the schema enum. `make verify` runs ruff, pyright, pytest and markdown lint.
+
+## Carry-forwards
+
+Applied from the earlier sessions, in full in the private resolution lists: forgectl CF-2 (the key, null instance, GitLab finished requests, `is_bot: null`, null size, `author_association`, `details.head_sha`, `blocked_by` in the hard rule, ids over logins); pr-comment (the dry-run and `--expect-plan` flow, `--expected-head`, `--reanchor-to`, `reanchored_draft`, the auto-approve guard); gatectl (declared head, `enforced` and `allow`, `warnings`, human outcomes only); review-run (the `meta.review_run` consumer rule, both exit-13 shapes, `--previous`, `cancel`, `resume --no-wait`, `run --no-wait`, the `rw-item` label); jobsctl (a unique key per launch, held jobs, `capacity`, `pass_env_undefined`, `--kill-grace`, `--max-retries`, `--cwd`). awkit's cron block carries the `XDG_CONFIG_HOME` and `XDG_STATE_HOME` lines when they are set. New requests for other tools are listed in the session's cross-tool notes.
+
+## Deviations from the decision log
+
+Where the final design differs from the earlier decision log, the interface wins and the difference is listed here.
+
+- Item ids are `rw-` plus 8 base32 characters (the log wrote `rw-<n>`).
+- `tiers.trusted_authors` and `tiers.allow_forks` are new keys; the default `allow_forks: true` keeps a fork PR in tier terms like any other, but an outside author's request no longer starts a review by itself (`author_external`, below), which narrows the log's "fork PRs are reviewed like any other" (user decision).
+- `post-stale` is replaced by `post-attention`, a single hook with a `reason`.
+- Counting against `max_attempts` only once a run existed is read through the run-outcomes table.
+- Without jobsctl, `poll` starts a review with `review-run run --no-wait --json` as a bounded call; the log's detached process is gone (user decision).
+- The daily limit `limits.rounds_per_day` (default 50) replaces the spend cap; a dollar cap waits for review-run's `cost_usd` (user decision).
+- Automatic actions have three extra conditions: the draft's `event` must be `comment` (`automatic_request_changes`), every changed path must match `auto_approve.paths` and the author id must be in `auto_approve.trusted_author_ids` for an approve (user decision).
+- The jobsctl unique key is `review:<round id>:<attempt>`, not `review:<pr>@<sha>`, so a launch can only adopt its own job.
+- A `pre-round` veto is recorded as a skipped item (`hook_veto`), as the log said, not as "not created"; it is re-asked only on a head change or `rerun`.
+- `rerun --override-escalation` does not exist; `resume` continues every hold and escalation.
+- An item with no round whose snapshot shows your own review is `skipped` (`already_reviewed`), not `posted`.
+- A `posted` item whose request is outstanding again after the post adds a `re_request` round on both hosts, subject to the cap; a `skipped` item whose condition clears uses the trigger `skip_cleared`.
+- An item that already has a round is never skipped as already reviewed, and marker detection is dropped.
+- A request from an author who is not an owner, member, collaborator, same-project GitLab author or trusted author is `skipped` (`author_external`) and only a human `rerun` starts it; `start.external_authors: review` removes the rule (user decision).
+- The approve gate is called whenever the post gate's decision is `allow`, also in shadow, so the approve policy builds a track record; acting still needs both gates enforced.
+- `hosts` is a list of host names only and review-watch's `me` keeps only `name`; the review account always comes from `forgectl whoami`.
+- The daily limit is checked at submission, the round cap counts rounds in flight, `rerun` also accepts `skipped` (except bot and own-PR), `open` and `rejected` items, `reject` of a bot or own-PR skip is refused (`not_rejectable`) so a permanent skip cannot be turned into a rejection that `rerun` reopens, `edited` is never cleared, one `tier` is stored per round, `auto_approve.trusted_author_ids` entries are `<host>:<account id>`, and logs are pruned after `retention.log`.
+- Post hooks run synchronously within their timeout unless the entry is `async: true`; the decision log's "detached" hooks are gone.
+- Leases renew from a heartbeat while their holder lives instead of a 15-minute expiry, `poll` has a whole-cycle deadline (`poll.deadline`) and `gate.timeout` is capped at 600 s.
+- Gates run before starts in a cycle, and an automatic post is attempted only in the cycle of its gate call, after facts and hard rules are checked again.
+- A pr-comment result that could have landed (exits 11 and 13 included) keeps a round `posting`; a human `accept` that completes a `posting` round posts as the human with no decision ids.
+- `--previous` is chosen across the PR's items (the newest `done` review-watch run of the PR), not only within the item.
+- The gate sees one tier, computed at `drafted` from facts bound to the draft's head; the creation-time tier serves the `pre-round` payload and display only.
+- A gate decision on an automatic post that pr-comment refuses is not retried in the cycle; the round waits for a human.
+- The approve gate's outcome is filed only when the human's `accept` carried `--approve` or the human rejected.
+- `prune` deletes only items whose PR is closed or merged.
+- `post-draft` carries no gate fields.
+- Attention reasons `expired` and `held` are folded into `failed` and `escalated` with a `details.kind`.
+- `review.mode` is removed (headless only); per-repo `include` and `exclude` are removed.
+- Human-only commands without a human exit 13 `confirmation_required` (design guide 4.4); `human_required` is no longer an exit-20 reason.
+- The off-limits default list grew and its patterns use the segment matcher with ASCII case folding.
+- `poll` no longer finalizes with `review-run show --no-refresh`; it always refreshes. Install `review-run cron install` alongside review-watch's cron, since expiry by `escalation_ttl` is a review-run `reconcile` step.
+- A round carries `post_intent.attempts` and `call_started_at`, so a crash after a started call is never read as "nothing landed"; the definitive-refusal rows of the pr-comment result table apply only to the first call's own result, each call attempt has its own audit pair, and a lease taker waits 630 s before it writes again.
+- An automatic post that lands with `quick_action_ran`, `approved_stale_head` or `audit_failed` fires `post-attention` `post_failed` with `details.code` set to the warning.
+- Completing an automatic `approve` intent as a human states `approve: yes` and `origin: automatic intent` in the plan and always needs the interactive prompt.
+- `author_external` items are not in the hourly recheck class; `status` shows each host's `complete` flag.
+- `off_limits` defaults: nested `.husky`, `.cursor`, `.vscode` and `.devcontainer` directories are any-depth, and `.gemini`, `.codex`, `.zed`, `.windsurfrules` and `.clinerules` are added; patterns accept only letters, digits and `. _ * ? / : @ + -`.
+- `tiers.trusted_authors` stays a login list (user-visible residual risk: a re-registered login), with `auto_approve.trusted_author_ids` as the identity-safe alternative that also lets an author start a round.
+- `log.jsonl` appends and the `prune` rewrite share a lock file, `log.lock`; shadow gate decision ids are never passed to pr-comment.

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review-watch/cli/error.json",
+  "title": "Error envelope (any command with --json)",
+  "description": "Printed on stdout for every non-zero exit, alone (no poll report, no plan).",
+  "type": "object",
+  "properties": {
+    "error": {
+      "$ref": "../defs.json#/$defs/error_body"
+    }
+  },
+  "required": [
+    "error"
+  ],
+  "additionalProperties": false
+}

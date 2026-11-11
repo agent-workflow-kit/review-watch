@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review-watch/hooks/post-post.json",
+  "title": "post-post hook payload (stdin)",
+  "description": "A round reached posted. Post hook: at least once (deduplicate by event_id), never fatal. review_id is the host's id (untrusted).",
+  "type": "object",
+  "properties": {
+    "tool": {
+      "const": "review-watch"
+    },
+    "hook": {
+      "const": "post-post"
+    },
+    "object_type": {
+      "const": "round"
+    },
+    "object_id": {
+      "$ref": "../defs.json#/$defs/round_id"
+    },
+    "repo": {
+      "$ref": "../defs.json#/$defs/repo_id"
+    },
+    "labels": {
+      "$ref": "../defs.json#/$defs/labels",
+      "maxItems": 3,
+      "description": "rw-item, rw-round and pr as key=value strings."
+    },
+    "event_id": {
+      "type": "string",
+      "pattern": "^(?:rw-[a-z2-7]{8}(?:#[0-9]+)?|[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*(?::[0-9]{1,5})?)-(?:post-draft|post-attention|post-post)-[0-9]+$",
+      "description": "<object id>-<hook>-<n>, the deduplication key (n is a per-(object, hook) counter stored with the outbox row)."
+    },
+    "pr": {
+      "$ref": "../defs.json#/$defs/pr"
+    },
+    "item": {
+      "$ref": "../defs.json#/$defs/item_id"
+    },
+    "n": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "actor": {
+      "$ref": "../defs.json#/$defs/actor"
+    },
+    "decision_ids": {
+      "$ref": "../defs.json#/$defs/decision_ids"
+    },
+    "review_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 128,
+      "x-untrusted": true
+    },
+    "head_sha": {
+      "$ref": "../defs.json#/$defs/sha"
+    },
+    "automatic": {
+      "type": "boolean"
+    },
+    "reanchored": {
+      "type": "boolean"
+    },
+    "edited": {
+      "type": "boolean"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "tool",
+    "hook",
+    "object_type",
+    "object_id",
+    "repo",
+    "labels",
+    "event_id",
+    "pr",
+    "item",
+    "n",
+    "actor",
+    "decision_ids",
+    "review_id",
+    "head_sha",
+    "automatic",
+    "reanchored",
+    "edited"
+  ],
+  "allOf": [
+    {
+      "properties": {
+        "labels": {
+          "contains": {
+            "type": "string",
+            "pattern": "^rw-item=rw-[a-z2-7]{8}$"
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "labels": {
+          "contains": {
+            "type": "string",
+            "pattern": "^rw-round=[0-9]+$"
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "labels": {
+          "contains": {
+            "type": "string",
+            "pattern": "^pr=[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*(?::[0-9]{1,5})?(?:/(?!\\.\\.?(?:/|#))[A-Za-z0-9._-]+)+#[1-9][0-9]{0,9}$"
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review-watch/cli/logs.json",
+  "title": "logs --json",
+  "description": "The item's log records; runs is empty unless --run.",
+  "type": "object",
+  "properties": {
+    "item": {
+      "$ref": "../defs.json#/$defs/item_id"
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "$ref": "../log.json"
+      }
+    },
+    "runs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "x-untrusted": true,
+        "description": "review-run show --no-refresh output, passed through (--run only)."
+      }
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "item",
+    "events",
+    "runs"
+  ]
+}

@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review-watch/cli/reject.json",
+  "title": "reject --json",
+  "description": "round is the non-terminal round this command ended as rejected, or null (item has no round, or the target was already rejected). item is null for a round-id target.",
+  "type": "object",
+  "properties": {
+    "target": {
+      "anyOf": [
+        {
+          "$ref": "../defs.json#/$defs/round_id"
+        },
+        {
+          "$ref": "../defs.json#/$defs/item_id"
+        }
+      ]
+    },
+    "item": {
+      "oneOf": [
+        {
+          "$ref": "../defs.json#/$defs/item"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "round": {
+      "oneOf": [
+        {
+          "$ref": "../defs.json#/$defs/round_id"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "run_canceled": {
+      "type": "boolean"
+    },
+    "job_resolved": {
+      "type": "boolean"
+    },
+    "job_canceled": {
+      "type": "boolean"
+    },
+    "outcomes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "decision_id": {
+            "$ref": "../defs.json#/$defs/decision_id"
+          },
+          "outcome": {
+            "$ref": "../defs.json#/$defs/outcome"
+          },
+          "changed": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "decision_id",
+          "outcome",
+          "changed"
+        ]
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_]{0,63}$"
+      },
+      "uniqueItems": true,
+      "description": "Side effects that failed (the cancel or the job resolve); poll retries them."
+    },
+    "dry_run": {
+      "type": "boolean"
+    },
+    "changed": {
+      "type": "boolean"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "target",
+    "item",
+    "round",
+    "run_canceled",
+    "job_resolved",
+    "job_canceled",
+    "outcomes",
+    "warnings",
+    "dry_run",
+    "changed"
+  ]
+}

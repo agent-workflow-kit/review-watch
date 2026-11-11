@@ -1,47 +1,338 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "review-watch/audit",
+  "$id": "review-watch/audit.json",
   "title": "review-watch audit.jsonl record",
-  "description": "Audit record for review-watch. Whether this tool writes audit records is decided in its design session (architecture §14).",
+  "description": "Public, append-only. One record pair per external action: phase attempted, then phase outcome, sharing attempt_id. No text from a host or a model.",
   "type": "object",
   "properties": {
     "ts": {
+      "$ref": "defs.json#/$defs/ts"
+    },
+    "phase": {
+      "enum": [
+        "attempted",
+        "outcome"
+      ]
+    },
+    "attempt_id": {
       "type": "string",
-      "format": "date-time"
+      "pattern": "^[A-Za-z0-9._-]{8,64}$"
     },
     "actor": {
-      "type": "string"
+      "$ref": "defs.json#/$defs/actor"
     },
     "decision_id": {
       "oneOf": [
         {
-          "type": "string"
+          "$ref": "defs.json#/$defs/decision_id"
         },
         {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
+          "$ref": "defs.json#/$defs/decision_ids"
+        },
+        {
+          "type": "null"
         }
       ]
     },
     "target": {
-      "type": "string"
+      "$ref": "defs.json#/$defs/pr"
     },
     "action": {
-      "type": "string"
+      "enum": [
+        "accept",
+        "auto_post",
+        "reject",
+        "rerun",
+        "resume",
+        "gate_outcome"
+      ]
     },
     "inputs": {
-      "type": "object"
+      "type": "object",
+      "properties": {
+        "head_sha": {
+          "$ref": "defs.json#/$defs/sha"
+        },
+        "draft_id": {
+          "$ref": "defs.json#/$defs/draft_id"
+        },
+        "draft_sha256": {
+          "$ref": "defs.json#/$defs/sha256"
+        },
+        "config_sha256": {
+          "$ref": "defs.json#/$defs/sha256"
+        },
+        "plan_sha256": {
+          "$ref": "defs.json#/$defs/sha256"
+        },
+        "round": {
+          "$ref": "defs.json#/$defs/round_id"
+        },
+        "override_escalation": {
+          "type": [
+            "string",
+            "boolean"
+          ],
+          "maxLength": 64
+        },
+        "intent_decision_ids": {
+          "$ref": "defs.json#/$defs/decision_ids",
+          "description": "The decision ids of the post intent a human accept completed; audited only, never passed to pr-comment."
+        },
+        "actor_source": {
+          "enum": [
+            "flag",
+            "tty",
+            "default"
+          ],
+          "description": "flag: an explicit --actor; tty: the default human actor on a TTY; default: auto:unknown."
+        },
+        "stdin_tty": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "required": []
     },
-    "result": {}
+    "result": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "status": {
+              "enum": [
+                "ok",
+                "failed",
+                "refused",
+                "vetoed",
+                "escalated",
+                "noop"
+              ]
+            },
+            "exit_code": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "reason": {
+              "oneOf": [
+                {
+                  "$ref": "defs.json#/$defs/error_reason"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "review_id": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "maxLength": 128,
+              "x-untrusted": true
+            },
+            "already_posted": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "plan_sha256": {
+              "oneOf": [
+                {
+                  "$ref": "defs.json#/$defs/sha256"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "run_canceled": {
+              "type": "boolean"
+            },
+            "job_resolved": {
+              "type": "boolean"
+            },
+            "outcome": {
+              "oneOf": [
+                {
+                  "$ref": "defs.json#/$defs/outcome"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "lower_code": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]{0,63}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "pr-comment's error.code when an accept or auto_post ended in a pr-comment failure."
+            },
+            "lower_reason": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]{0,63}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "status"
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
   },
+  "additionalProperties": false,
   "required": [
     "ts",
+    "phase",
+    "attempt_id",
     "actor",
+    "decision_id",
     "target",
     "action",
+    "inputs",
     "result"
   ],
-  "additionalProperties": true
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "phase": {
+            "const": "attempted"
+          }
+        },
+        "required": [
+          "phase"
+        ]
+      },
+      "then": {
+        "properties": {
+          "result": {
+            "type": "null"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "result": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "enum": [
+                  "ok",
+                  "failed",
+                  "refused",
+                  "vetoed",
+                  "escalated",
+                  "noop"
+                ]
+              },
+              "exit_code": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "reason": {
+                "oneOf": [
+                  {
+                    "$ref": "defs.json#/$defs/error_reason"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "review_id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "maxLength": 128,
+                "x-untrusted": true
+              },
+              "already_posted": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "plan_sha256": {
+                "oneOf": [
+                  {
+                    "$ref": "defs.json#/$defs/sha256"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "run_canceled": {
+                "type": "boolean"
+              },
+              "job_resolved": {
+                "type": "boolean"
+              },
+              "outcome": {
+                "oneOf": [
+                  {
+                    "$ref": "defs.json#/$defs/outcome"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "lower_code": {
+                "oneOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9_]{0,63}$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "pr-comment's error.code when an accept or auto_post ended in a pr-comment failure."
+              },
+              "lower_reason": {
+                "oneOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9_]{0,63}$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "status"
+            ]
+          }
+        }
+      }
+    }
+  ]
 }

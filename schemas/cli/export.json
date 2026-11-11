@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review-watch/cli/export.json",
+  "title": "export (JSON lines or one array with --json)",
+  "description": "Without --json stdout is JSON lines, each an audit record (default) or a log record (--log); with --json one array.",
+  "oneOf": [
+    {
+      "$ref": "../audit.json"
+    },
+    {
+      "$ref": "../log.json"
+    },
+    {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "$ref": "../audit.json"
+          },
+          {
+            "$ref": "../log.json"
+          }
+        ]
+      }
+    }
+  ]
+}
