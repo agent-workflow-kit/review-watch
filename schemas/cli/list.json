@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review-watch/cli/list.json",
+  "title": "list --json",
+  "description": "Items with their latest round in the documented order.",
+  "type": "object",
+  "properties": {
+    "items": {
+      "type": "array",
+      "items": {
+        "$ref": "../defs.json#/$defs/item"
+      }
+    },
+    "truncated": {
+      "type": "boolean"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "items",
+    "truncated"
+  ]
+}

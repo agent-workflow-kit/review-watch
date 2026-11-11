@@ -1,0 +1,201 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review-watch/cli/status.json",
+  "title": "status --json",
+  "description": "Does not contact a host. items and rounds are counts per state.",
+  "type": "object",
+  "properties": {
+    "items": {
+      "type": "object",
+      "propertyNames": {
+        "$ref": "../defs.json#/$defs/item_state"
+      },
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "rounds": {
+      "type": "object",
+      "propertyNames": {
+        "$ref": "../defs.json#/$defs/round_state"
+      },
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "skipped": {
+      "type": "object",
+      "propertyNames": {
+        "$ref": "../defs.json#/$defs/skip_reason"
+      },
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "spend": {
+      "type": "object",
+      "properties": {
+        "today_usd": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "cap_usd": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "runs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unknown_cost": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cost_unavailable": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "today_usd",
+        "cap_usd",
+        "runs",
+        "unknown_cost",
+        "cost_unavailable"
+      ]
+    },
+    "waiting": {
+      "type": "object",
+      "properties": {
+        "waiting_slot": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "spend_cap": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "waiting_slot",
+        "spend_cap"
+      ]
+    },
+    "last_poll": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "started_at": {
+              "$ref": "../defs.json#/$defs/ts"
+            },
+            "finished_at": {
+              "$ref": "../defs.json#/$defs/ts"
+            },
+            "hosts": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "host": {
+                    "$ref": "../defs.json#/$defs/host"
+                  },
+                  "error": {
+                    "oneOf": [
+                      {
+                        "$ref": "../defs.json#/$defs/failure_code"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "consecutive_failures": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "host",
+                  "error",
+                  "consecutive_failures"
+                ]
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "started_at",
+            "finished_at",
+            "hosts"
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "out_of_scope": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "gatectl": {
+      "oneOf": [
+        {
+          "const": "not_configured"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "policy": {
+                "$ref": "../defs.json#/$defs/decision_id"
+              },
+              "repo": {
+                "$ref": "../defs.json#/$defs/repo_id"
+              },
+              "stats": {
+                "type": "object",
+                "properties": {
+                  "recommend": {},
+                  "upper_bound": {}
+                },
+                "additionalProperties": true,
+                "description": "gatectl stats --json passed through."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "policy",
+              "repo",
+              "stats"
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "items",
+    "rounds",
+    "skipped",
+    "spend",
+    "waiting",
+    "last_poll",
+    "out_of_scope",
+    "gatectl"
+  ]
+}

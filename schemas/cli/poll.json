@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review-watch/cli/poll.json",
+  "title": "poll --json",
+  "description": "The poll report. With poll --dry-run the same shape previews what would start. On exit 12 all_hosts_failed the report also carries `error` (the error envelope body). Exit 0 omits `error`.",
+  "type": "object",
+  "properties": {
+    "started_at": {
+      "$ref": "../defs.json#/$defs/poll_report/properties/started_at"
+    },
+    "finished_at": {
+      "$ref": "../defs.json#/$defs/poll_report/properties/finished_at"
+    },
+    "hosts": {
+      "$ref": "../defs.json#/$defs/poll_report/properties/hosts"
+    },
+    "discovered": {
+      "$ref": "../defs.json#/$defs/poll_report/properties/discovered"
+    },
+    "new_items": {
+      "$ref": "../defs.json#/$defs/poll_report/properties/new_items"
+    },
+    "skipped": {
+      "$ref": "../defs.json#/$defs/poll_report/properties/skipped"
+    },
+    "out_of_scope": {
+      "$ref": "../defs.json#/$defs/poll_report/properties/out_of_scope"
+    },
+    "finalized": {
+      "$ref": "../defs.json#/$defs/poll_report/properties/finalized"
+    },
+    "stale": {
+      "$ref": "../defs.json#/$defs/poll_report/properties/stale"
+    },
+    "closed": {
+      "$ref": "../defs.json#/$defs/poll_report/properties/closed"
+    },
+    "started": {
+      "$ref": "../defs.json#/$defs/poll_report/properties/started"
+    },
+    "queued": {
+      "$ref": "../defs.json#/$defs/poll_report/properties/queued"
+    },
+    "errors": {
+      "$ref": "../defs.json#/$defs/poll_report/properties/errors"
+    },
+    "already_running": {
+      "$ref": "../defs.json#/$defs/poll_report/properties/already_running"
+    },
+    "error": {
+      "$ref": "../defs.json#/$defs/error_body"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "started_at",
+    "finished_at",
+    "hosts",
+    "discovered",
+    "new_items",
+    "skipped",
+    "out_of_scope",
+    "finalized",
+    "stale",
+    "closed",
+    "started",
+    "queued",
+    "errors",
+    "already_running"
+  ]
+}

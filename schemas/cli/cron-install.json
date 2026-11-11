@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review-watch/cli/cron-install.json",
+  "title": "cron install --json",
+  "description": "block is the managed block text as written (or that would be written).",
+  "type": "object",
+  "properties": {
+    "action": {
+      "const": "install"
+    },
+    "dry_run": {
+      "type": "boolean"
+    },
+    "changed": {
+      "type": "boolean"
+    },
+    "block": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 8192
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "action",
+    "dry_run",
+    "changed",
+    "block"
+  ]
+}

@@ -1,12 +1,734 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "review-watch/config",
+  "$id": "review-watch/config.json",
   "title": "review-watch config",
+  "description": "Self-contained (no external $ref). Unknown keys are refused. Defaults are those of docs/interface.md, Config. Per-repo tiers.lines, tiers.files, max_post_tier and max_approve_tier may only be stricter than the global value: the loader checks that, JSON Schema cannot.",
   "type": "object",
   "properties": {
+    "hosts": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/host"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": {
+            "$ref": "#/$defs/host"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "me": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      ],
+      "description": "Required. Hosts to poll: a list, or a map host -> {me: login} to pin the account login."
+    },
+    "include": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/glob"
+      },
+      "uniqueItems": true,
+      "default": [
+        "*"
+      ]
+    },
+    "exclude": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/glob"
+      },
+      "uniqueItems": true,
+      "default": []
+    },
+    "me": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "github": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "gitlab": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      },
+      "additionalProperties": false
+    },
+    "max_rounds": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000,
+      "default": 3
+    },
+    "max_concurrent": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 64,
+      "default": 2
+    },
+    "max_attempts": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 20,
+      "default": 2
+    },
+    "jobs": {
+      "type": "object",
+      "properties": {
+        "use_jobsctl": {
+          "enum": [
+            "auto",
+            true,
+            false
+          ],
+          "default": "auto"
+        },
+        "queue": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._-]{1,64}$",
+          "default": "reviews"
+        },
+        "pass_env": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$"
+          },
+          "uniqueItems": true,
+          "default": []
+        }
+      },
+      "additionalProperties": false
+    },
+    "review": {
+      "type": "object",
+      "properties": {
+        "skill": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$",
+          "default": null
+        },
+        "mode": {
+          "enum": [
+            "headless",
+            "interactive"
+          ],
+          "default": "headless"
+        },
+        "previous": {
+          "type": "boolean",
+          "default": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "tiers": {
+      "type": "object",
+      "properties": {
+        "lines": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000
+            },
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000
+            }
+          ],
+          "items": false,
+          "minItems": 2,
+          "default": [
+            50,
+            300
+          ],
+          "description": "[medium, high] changed-line thresholds; a per-repo value may only be lower (loader check)."
+        },
+        "files": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000
+            },
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000
+            }
+          ],
+          "items": false,
+          "minItems": 2,
+          "default": [
+            3,
+            15
+          ],
+          "description": "[medium, high] changed-file thresholds; a per-repo value may only be lower (loader check)."
+        },
+        "sensitive_globs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/glob"
+          },
+          "uniqueItems": true,
+          "default": [],
+          "description": "Paths that make a round at least tier 2; per-repo values add."
+        },
+        "trusted_authors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/login"
+          },
+          "uniqueItems": true,
+          "default": []
+        },
+        "allow_forks": {
+          "type": "boolean",
+          "default": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "off_limits": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/glob"
+      },
+      "uniqueItems": true,
+      "description": "Default is the list in the interface's Hard rules; per-repo values add and never remove."
+    },
+    "max_post_tier": {
+      "enum": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "default": 1
+    },
+    "max_approve_tier": {
+      "enum": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "default": 0
+    },
+    "auto_post": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "policy": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._:-]{1,64}$",
+          "default": "review-post"
+        }
+      },
+      "additionalProperties": false
+    },
+    "auto_approve": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "policy": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._:-]{1,64}$",
+          "default": "review-approve"
+        }
+      },
+      "additionalProperties": false
+    },
+    "gate": {
+      "type": "object",
+      "properties": {
+        "timeout": {
+          "$ref": "#/$defs/duration",
+          "default": "60s"
+        }
+      },
+      "additionalProperties": false
+    },
+    "spend": {
+      "type": "object",
+      "properties": {
+        "daily_cap_usd": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "default": null
+        },
+        "timezone": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z0-9._/+-]{1,64}$",
+          "default": null,
+          "description": "An IANA zone name; null is the machine's local zone."
+        }
+      },
+      "additionalProperties": false
+    },
+    "poll": {
+      "type": "object",
+      "properties": {
+        "max_snapshots": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000,
+          "default": 30
+        },
+        "failure_alert_after": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000,
+          "default": 3
+        }
+      },
+      "additionalProperties": false
+    },
+    "retention": {
+      "type": "object",
+      "properties": {
+        "closed": {
+          "$ref": "#/$defs/duration",
+          "default": "90d"
+        }
+      },
+      "additionalProperties": false
+    },
+    "cron": {
+      "type": "object",
+      "properties": {
+        "schedule": {
+          "type": "string",
+          "pattern": "^\\S+(?: \\S+){4}$",
+          "maxLength": 128,
+          "default": "*/5 * * * *"
+        },
+        "env_file": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 4096,
+          "default": null
+        }
+      },
+      "additionalProperties": false
+    },
+    "forgectl_cmd": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 4096
+      },
+      "minItems": 1,
+      "default": [
+        "forgectl"
+      ],
+      "description": "An argv list run without a shell; absolute paths are recommended under cron."
+    },
+    "review_run_cmd": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 4096
+      },
+      "minItems": 1,
+      "default": [
+        "review-run"
+      ],
+      "description": "An argv list run without a shell; absolute paths are recommended under cron."
+    },
+    "pr_comment_cmd": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 4096
+      },
+      "minItems": 1,
+      "default": [
+        "pr-comment"
+      ],
+      "description": "An argv list run without a shell; absolute paths are recommended under cron."
+    },
+    "gatectl_cmd": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 4096
+      },
+      "minItems": 1,
+      "default": [
+        "gatectl"
+      ],
+      "description": "An argv list run without a shell; absolute paths are recommended under cron."
+    },
+    "jobsctl_cmd": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 4096
+      },
+      "minItems": 1,
+      "default": [
+        "jobsctl"
+      ],
+      "description": "An argv list run without a shell; absolute paths are recommended under cron."
+    },
     "hooks": {
-      "type": "object"
+      "type": "object",
+      "properties": {
+        "pre-round": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "cmd": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096
+              },
+              "timeout": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 600,
+                "default": 30
+              },
+              "async": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "cmd"
+            ]
+          }
+        },
+        "post-draft": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "cmd": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096
+              },
+              "timeout": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 600,
+                "default": 30
+              },
+              "async": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "cmd"
+            ]
+          }
+        },
+        "post-attention": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "cmd": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096
+              },
+              "timeout": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 600,
+                "default": 30
+              },
+              "async": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "cmd"
+            ]
+          }
+        },
+        "post-post": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "cmd": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096
+              },
+              "timeout": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 600,
+                "default": 30
+              },
+              "async": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "cmd"
+            ]
+          }
+        }
+      },
+      "additionalProperties": false,
+      "default": {}
+    },
+    "repos": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*(?::[0-9]{1,5})?(?:/(?!\\.\\.?(?:/|$))[A-Za-z0-9._-]+)+$": {
+          "type": "object",
+          "properties": {
+            "include": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/glob"
+              },
+              "uniqueItems": true
+            },
+            "exclude": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/glob"
+              },
+              "uniqueItems": true
+            },
+            "max_rounds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000
+            },
+            "tiers": {
+              "type": "object",
+              "properties": {
+                "lines": {
+                  "type": "array",
+                  "prefixItems": [
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 100000
+                    },
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 100000
+                    }
+                  ],
+                  "items": false,
+                  "minItems": 2,
+                  "default": [
+                    50,
+                    300
+                  ],
+                  "description": "[medium, high] changed-line thresholds; a per-repo value may only be lower (loader check)."
+                },
+                "files": {
+                  "type": "array",
+                  "prefixItems": [
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 100000
+                    },
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 100000
+                    }
+                  ],
+                  "items": false,
+                  "minItems": 2,
+                  "default": [
+                    3,
+                    15
+                  ],
+                  "description": "[medium, high] changed-file thresholds; a per-repo value may only be lower (loader check)."
+                },
+                "sensitive_globs": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/glob"
+                  },
+                  "uniqueItems": true,
+                  "default": [],
+                  "description": "Paths that make a round at least tier 2; per-repo values add."
+                },
+                "trusted_authors": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/login"
+                  },
+                  "uniqueItems": true,
+                  "default": []
+                },
+                "allow_forks": {
+                  "type": "boolean",
+                  "default": true
+                }
+              },
+              "additionalProperties": false
+            },
+            "max_post_tier": {
+              "enum": [
+                0,
+                1,
+                2,
+                3
+              ]
+            },
+            "max_approve_tier": {
+              "enum": [
+                0,
+                1,
+                2,
+                3
+              ]
+            },
+            "off_limits": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/glob"
+              },
+              "uniqueItems": true
+            },
+            "auto_post": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "default": false
+                },
+                "policy": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9._:-]{1,64}$",
+                  "default": "review-post"
+                }
+              },
+              "additionalProperties": false
+            },
+            "auto_approve": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "default": false
+                },
+                "policy": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9._:-]{1,64}$",
+                  "default": "review-approve"
+                }
+              },
+              "additionalProperties": false
+            },
+            "review": {
+              "type": "object",
+              "properties": {
+                "skill": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false,
+      "default": {}
     }
   },
-  "additionalProperties": true
+  "required": [
+    "hosts"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "host": {
+      "type": "string",
+      "pattern": "^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*(?::[0-9]{1,5})?$",
+      "description": "Lowercase host, optional :port."
+    },
+    "duration": {
+      "type": "string",
+      "pattern": "^(?:0|[0-9]+(?:ms|s|m|h|d))$",
+      "description": "0 or an integer and a unit (ms, s, m, h, d)."
+    },
+    "glob": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^[A-Za-z0-9._*/:@+-]+$",
+      "description": "A repo-id or path glob (* within a segment, ** across segments)."
+    },
+    "login": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9._@-]+$",
+      "description": "An account login."
+    }
+  }
 }

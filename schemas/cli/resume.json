@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review-watch/cli/resume.json",
+  "title": "resume --json",
+  "description": "kind says whether review-run resume was called on a run or the held pre-run step was rerun with an override.",
+  "type": "object",
+  "properties": {
+    "round": {
+      "$ref": "../defs.json#/$defs/round"
+    },
+    "run_id": {
+      "oneOf": [
+        {
+          "$ref": "../defs.json#/$defs/run_id"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "kind": {
+      "enum": [
+        "run",
+        "pre_run_hold"
+      ]
+    },
+    "dry_run": {
+      "type": "boolean"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "round",
+    "run_id",
+    "kind",
+    "dry_run"
+  ]
+}

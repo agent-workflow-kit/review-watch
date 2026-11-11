@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review-watch/cli/rerun.json",
+  "title": "rerun --json",
+  "description": "round is the new round (null with --dry-run). superseded is the stale round closed by this rerun, if any.",
+  "type": "object",
+  "properties": {
+    "item": {
+      "$ref": "../defs.json#/$defs/item"
+    },
+    "round": {
+      "oneOf": [
+        {
+          "$ref": "../defs.json#/$defs/round"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "superseded": {
+      "oneOf": [
+        {
+          "$ref": "../defs.json#/$defs/round_id"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "reopened": {
+      "type": "boolean"
+    },
+    "forced": {
+      "type": "boolean"
+    },
+    "dry_run": {
+      "type": "boolean"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "item",
+    "round",
+    "superseded",
+    "reopened",
+    "forced",
+    "dry_run"
+  ]
+}

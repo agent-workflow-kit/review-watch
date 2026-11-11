@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review-watch/cli/accept.json",
+  "title": "accept --json",
+  "description": "Exit 0: posted or already_posted. outcomes lists the gate outcomes filed.",
+  "type": "object",
+  "properties": {
+    "round": {
+      "$ref": "../defs.json#/$defs/round"
+    },
+    "post": {
+      "$ref": "../defs.json#/$defs/post_result"
+    },
+    "automatic": {
+      "const": false
+    },
+    "reanchored": {
+      "type": "boolean"
+    },
+    "outcomes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "decision_id": {
+            "$ref": "../defs.json#/$defs/decision_id"
+          },
+          "outcome": {
+            "$ref": "../defs.json#/$defs/outcome"
+          },
+          "changed": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "decision_id",
+          "outcome",
+          "changed"
+        ]
+      }
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "round",
+    "post",
+    "automatic",
+    "reanchored",
+    "outcomes"
+  ]
+}

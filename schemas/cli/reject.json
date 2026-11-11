@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review-watch/cli/reject.json",
+  "title": "reject --json",
+  "description": "rounds lists the rounds ended as rejected by this command.",
+  "type": "object",
+  "properties": {
+    "target": {
+      "anyOf": [
+        {
+          "$ref": "../defs.json#/$defs/round_id"
+        },
+        {
+          "$ref": "../defs.json#/$defs/item_id"
+        }
+      ]
+    },
+    "item": {
+      "$ref": "../defs.json#/$defs/item"
+    },
+    "rounds": {
+      "type": "array",
+      "items": {
+        "$ref": "../defs.json#/$defs/round_id"
+      },
+      "uniqueItems": true
+    },
+    "run_canceled": {
+      "type": "boolean"
+    },
+    "job_resolved": {
+      "type": "boolean"
+    },
+    "outcomes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "decision_id": {
+            "$ref": "../defs.json#/$defs/decision_id"
+          },
+          "outcome": {
+            "$ref": "../defs.json#/$defs/outcome"
+          },
+          "changed": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "decision_id",
+          "outcome",
+          "changed"
+        ]
+      }
+    },
+    "dry_run": {
+      "type": "boolean"
+    },
+    "changed": {
+      "type": "boolean"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "target",
+    "item",
+    "rounds",
+    "run_canceled",
+    "job_resolved",
+    "outcomes",
+    "dry_run",
+    "changed"
+  ]
+}

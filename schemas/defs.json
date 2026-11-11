@@ -1,0 +1,1559 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review-watch/defs.json",
+  "title": "review-watch shared definitions",
+  "description": "Not an output on its own. Shared definitions referenced by the CLI, hook, audit and log schemas. config.json embeds its own copies.",
+  "$defs": {
+    "host": {
+      "type": "string",
+      "pattern": "^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*(?::[0-9]{1,5})?$",
+      "description": "Lowercase host, optional :port."
+    },
+    "repo_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*(?::[0-9]{1,5})?(?:/(?!\\.\\.?(?:/|$))[A-Za-z0-9._-]+)+$",
+      "description": "host/<full project path>."
+    },
+    "pr": {
+      "type": "string",
+      "pattern": "^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*(?::[0-9]{1,5})?(?:/(?!\\.\\.?(?:/|#))[A-Za-z0-9._-]+)+#[1-9][0-9]{0,9}$",
+      "description": "Canonical PR form host/<full project path>#N (GitLab numbers written without !)."
+    },
+    "pr_id": {
+      "type": "string",
+      "pattern": "^(?!.*\\.\\.)[A-Za-z0-9][A-Za-z0-9:/_=.+-]{0,127}$",
+      "description": "forgectl's opaque PR id, stable across repository renames."
+    },
+    "instance": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9:/_=.+-]{1,128}$",
+      "description": "forgectl's review_requests[].instance, opaque; null on an item whose request has no instance."
+    },
+    "sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "ts": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$",
+      "description": "UTC, YYYY-MM-DDTHH:MM:SS.ffffffZ."
+    },
+    "duration": {
+      "type": "string",
+      "pattern": "^(?:0|[0-9]+(?:ms|s|m|h|d))$",
+      "description": "0 or an integer and a unit (ms, s, m, h, d)."
+    },
+    "count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "item_id": {
+      "type": "string",
+      "pattern": "^rw-[a-z2-7]{8}$",
+      "description": "rw- plus 8 lowercase base32 characters (a-z, 2-7). Output always shows the full id."
+    },
+    "round_id": {
+      "type": "string",
+      "pattern": "^rw-[a-z2-7]{8}#[0-9]+$",
+      "description": "<item id>#<n>, n from 1."
+    },
+    "actor": {
+      "type": "string",
+      "pattern": "^(?:human|auto):[A-Za-z0-9._@-]{1,64}$"
+    },
+    "decision_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._:@/-]{1,128}$"
+    },
+    "decision_ids": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/decision_id"
+      },
+      "maxItems": 16
+    },
+    "label": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_.-]{0,63}=[A-Za-z0-9._:/#@+=,-]{0,256}$",
+      "description": "key=value."
+    },
+    "labels": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/label"
+      },
+      "uniqueItems": true,
+      "description": "The rw-item, rw-round and pr labels as key=value strings."
+    },
+    "base_ref": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255,
+      "x-untrusted": true,
+      "description": "Untrusted: a branch name as reported by forgectl."
+    },
+    "glob": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^[A-Za-z0-9._*/:@+-]+$",
+      "description": "A repo-id or path glob (* within a segment, ** across segments)."
+    },
+    "login": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9._@-]+$",
+      "description": "An account login."
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^rr-[a-z2-7]{8}$",
+      "description": "review-run's run id."
+    },
+    "job_id": {
+      "type": "string",
+      "pattern": "^jb-[a-z2-7]{8}$",
+      "description": "jobsctl's job id."
+    },
+    "draft_id": {
+      "type": "string",
+      "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+      "description": "pr-comment's draft id."
+    },
+    "item_state": {
+      "enum": [
+        "open",
+        "skipped",
+        "posted",
+        "rejected",
+        "closed"
+      ]
+    },
+    "round_state": {
+      "enum": [
+        "queued",
+        "running",
+        "escalated",
+        "drafted",
+        "stale",
+        "posting",
+        "posted",
+        "failed",
+        "rejected",
+        "closed"
+      ]
+    },
+    "queue_reason": {
+      "enum": [
+        "waiting_slot",
+        "spend_cap",
+        "held",
+        "submit_failed",
+        "retry_wait"
+      ]
+    },
+    "skip_reason": {
+      "enum": [
+        "draft",
+        "bot_author",
+        "bot_unknown",
+        "own_pr",
+        "already_reviewed"
+      ]
+    },
+    "stale_reason": {
+      "enum": [
+        "stale_head",
+        "retargeted"
+      ]
+    },
+    "closed_reason": {
+      "enum": [
+        "pr_closed",
+        "pr_merged",
+        "superseded"
+      ]
+    },
+    "attention_reason": {
+      "enum": [
+        "escalated",
+        "stale",
+        "failed",
+        "expired",
+        "round_limit",
+        "spend_cap",
+        "held",
+        "poll_failed"
+      ]
+    },
+    "failure_reason": {
+      "enum": [
+        "prefetch_failed",
+        "stale_head",
+        "too_large",
+        "launch_failed",
+        "canceled",
+        "session_failed",
+        "unreported",
+        "killed",
+        "timeout",
+        "lost",
+        "runner_lost",
+        "agent_gone",
+        "expired",
+        "implicit_done",
+        "artifact_missing",
+        "artifact_mismatch",
+        "skill_missing",
+        "artifact_invalid",
+        "internal",
+        "no_run",
+        "draft_invalid",
+        "tool_missing",
+        "tool_too_old",
+        "unknown_host",
+        "pre_run_vetoed"
+      ],
+      "description": "review-run's failed reasons plus no_run, draft_invalid and the reasons for a round that failed before its session."
+    },
+    "phase": {
+      "enum": [
+        "prefetch",
+        "code_run",
+        "session",
+        "finalize"
+      ],
+      "description": "Mirrors review-run's phase."
+    },
+    "tier": {
+      "enum": [
+        0,
+        1,
+        2,
+        3
+      ]
+    },
+    "tier_reason": {
+      "enum": [
+        "off_limits",
+        "size_unknown",
+        "author_untrusted",
+        "ci_not_passing",
+        "base_not_default",
+        "fork_not_allowed",
+        "input_missing",
+        "model_risk_high",
+        "lines_high",
+        "files_high",
+        "sensitive_path",
+        "model_risk_medium",
+        "lines_medium",
+        "files_medium"
+      ],
+      "description": "Closed list of the rule codes that set or raised the tier."
+    },
+    "auto_blocked_code": {
+      "enum": [
+        "own_pr",
+        "bot_author",
+        "ci_not_passing",
+        "off_limits",
+        "tier_too_high",
+        "meta_signal",
+        "head_moved_since_draft",
+        "reanchored",
+        "findings_block_approve"
+      ]
+    },
+    "error_code": {
+      "enum": [
+        "usage",
+        "config_invalid",
+        "not_found",
+        "ambiguous",
+        "vetoed",
+        "escalated",
+        "confirmation_required",
+        "refused",
+        "failed",
+        "tool_missing",
+        "tool_too_old",
+        "state_unsafe",
+        "internal"
+      ]
+    },
+    "refusal_reason": {
+      "enum": [
+        "not_drafted",
+        "not_editable",
+        "not_escalated",
+        "round_active",
+        "round_limit",
+        "spend_cap",
+        "stale_head",
+        "retargeted",
+        "revision_changed",
+        "human_required",
+        "item_closed",
+        "stale_base",
+        "plan_changed",
+        "auto_approve_disabled",
+        "auto_approve_reanchored",
+        "not_open",
+        "self_approval",
+        "drafts_present",
+        "pending_review_exists",
+        "not_resolvable",
+        "too_large",
+        "unknown_host",
+        "live",
+        "lower_refused"
+      ]
+    },
+    "error_reason": {
+      "enum": [
+        "not_drafted",
+        "not_editable",
+        "not_escalated",
+        "round_active",
+        "round_limit",
+        "spend_cap",
+        "stale_head",
+        "retargeted",
+        "revision_changed",
+        "human_required",
+        "item_closed",
+        "stale_base",
+        "plan_changed",
+        "auto_approve_disabled",
+        "auto_approve_reanchored",
+        "not_open",
+        "self_approval",
+        "drafts_present",
+        "pending_review_exists",
+        "not_resolvable",
+        "too_large",
+        "unknown_host",
+        "live",
+        "lower_refused",
+        "approve_conflicts_event",
+        "invalid_draft",
+        "all_hosts_failed",
+        "lower_contract_mismatch"
+      ],
+      "description": "Exit 20 refusal reasons plus the reasons of exit 2 and 12."
+    },
+    "failure_code": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,63}$",
+      "description": "A forgectl or review-watch error code, passed through."
+    },
+    "verdict": {
+      "enum": [
+        "approve",
+        "comment",
+        "request_changes"
+      ],
+      "x-untrusted": true,
+      "description": "The session's claim."
+    },
+    "risk": {
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "x-untrusted": true,
+      "description": "The session's claim; can only raise the tier."
+    },
+    "coverage_status": {
+      "enum": [
+        "full",
+        "partial"
+      ]
+    },
+    "code_run_status": {
+      "enum": [
+        "ok",
+        "failed",
+        "skipped",
+        "not_configured"
+      ]
+    },
+    "sandbox_level": {
+      "enum": [
+        "required",
+        "preferred",
+        "off"
+      ]
+    },
+    "severity_counts": {
+      "type": "object",
+      "properties": {
+        "blocker": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "major": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "minor": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "nit": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "info": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unspecified": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "blocker",
+        "major",
+        "minor",
+        "nit",
+        "info",
+        "unspecified"
+      ]
+    },
+    "gate_decision": {
+      "enum": [
+        "allow",
+        "deny",
+        "escalate"
+      ]
+    },
+    "outcome": {
+      "enum": [
+        "agree",
+        "disagree"
+      ]
+    },
+    "next_action": {
+      "enum": [
+        "accept",
+        "accept_reanchor",
+        "edit",
+        "reject",
+        "rerun",
+        "rerun_force",
+        "resume"
+      ],
+      "description": "Commands now possible on the round: accept, accept --reanchor, edit, reject, rerun, rerun --force, resume."
+    },
+    "trigger": {
+      "enum": [
+        "new_request",
+        "first_sight",
+        "rerun",
+        "skip_cleared"
+      ]
+    },
+    "hook_name": {
+      "enum": [
+        "pre-round",
+        "post-draft",
+        "post-attention",
+        "post-post"
+      ]
+    },
+    "failure": {
+      "type": "object",
+      "properties": {
+        "reason": {
+          "$ref": "#/$defs/failure_reason"
+        },
+        "retryable": {
+          "type": "boolean"
+        },
+        "retry_after_s": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "exit_code": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "reason",
+        "retryable",
+        "retry_after_s",
+        "exit_code"
+      ],
+      "description": "Copied from review-run's failure or set by review-watch; closed codes and counts only."
+    },
+    "gate": {
+      "type": "object",
+      "properties": {
+        "policy": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._:-]{1,64}$"
+        },
+        "decision_id": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/decision_id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "decision": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/gate_decision"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The would-be decision; null when the call gave none."
+        },
+        "enforced": {
+          "type": "boolean"
+        },
+        "error": {
+          "oneOf": [
+            {
+              "enum": [
+                "gate_error"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "gate_error when gatectl exited 1 or 2; no action was taken."
+        },
+        "outcome": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/outcome"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The human outcome filed once for this decision id, else null."
+        },
+        "checked_at": {
+          "$ref": "#/$defs/ts"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "policy",
+        "decision_id",
+        "decision",
+        "enforced",
+        "error",
+        "outcome",
+        "checked_at"
+      ],
+      "description": "A gate record: the decision id, the would-be decision and the enforced flag."
+    },
+    "meta": {
+      "type": "object",
+      "properties": {
+        "verdict": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/verdict"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "severity_counts": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/severity_counts"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "risk": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/risk"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "coverage_status": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/coverage_status"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "code_run_status": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/code_run_status"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "head_moved": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sandbox": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sandbox_level"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tools_checked": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "tools_unexpected": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "verdict",
+        "severity_counts",
+        "risk",
+        "coverage_status",
+        "code_run_status",
+        "head_moved",
+        "sandbox",
+        "tools_checked",
+        "tools_unexpected"
+      ],
+      "description": "The run summary fields copied onto the round. Claims; the closed fields never authorize anything."
+    },
+    "post_result": {
+      "type": "object",
+      "properties": {
+        "review_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128,
+          "x-untrusted": true
+        },
+        "posted_inline": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._-]{1,64}$"
+          }
+        },
+        "moved": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9._-]{1,64}$"
+              },
+              "reason": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]{0,63}$"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "reason"
+            ]
+          }
+        },
+        "landed": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "already_posted": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "plan_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "review_id",
+        "posted_inline",
+        "moved",
+        "landed",
+        "already_posted",
+        "plan_sha256"
+      ],
+      "description": "The stored pr-comment result."
+    },
+    "post_error": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "$ref": "#/$defs/error_code"
+        },
+        "reason": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/error_reason"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "landed": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "retry": {
+          "enum": [
+            "same_command",
+            "new_key",
+            "none",
+            null
+          ]
+        },
+        "at": {
+          "$ref": "#/$defs/ts"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "reason",
+        "landed",
+        "retry",
+        "at"
+      ],
+      "description": "Set while a round is posting after a failure; running the same accept again is the answer."
+    },
+    "round": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/round_id"
+        },
+        "item": {
+          "$ref": "#/$defs/item_id"
+        },
+        "n": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "state": {
+          "$ref": "#/$defs/round_state"
+        },
+        "queue_reason": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/queue_reason"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "head_sha": {
+          "$ref": "#/$defs/sha"
+        },
+        "base_ref": {
+          "$ref": "#/$defs/base_ref"
+        },
+        "tier": {
+          "$ref": "#/$defs/tier"
+        },
+        "tier_reasons": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/tier_reason"
+          },
+          "uniqueItems": true
+        },
+        "run_id": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/run_id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "run_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/run_id"
+          },
+          "uniqueItems": true
+        },
+        "phase": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/phase"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "attempt": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "job_id": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/job_id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "draft_id": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/draft_id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "revision": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The latest revision number; null before a draft exists."
+        },
+        "edited": {
+          "type": "boolean"
+        },
+        "reanchored": {
+          "type": "boolean"
+        },
+        "stale_reason": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/stale_reason"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "stale_head_sha": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "stale_since": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ts"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "escalated_since": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ts"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "failure": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/failure"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "post_gate": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/gate"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "approve_gate": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/gate"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "auto_blocked_by": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/auto_blocked_code"
+          },
+          "uniqueItems": true
+        },
+        "meta": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/meta"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "post": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/post_result"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "post_error": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/post_error"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "hook_decision_ids": {
+          "$ref": "#/$defs/decision_ids"
+        },
+        "reject_reason": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 1024,
+          "x-untrusted": true
+        },
+        "closed_reason": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/closed_reason"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "created_at": {
+          "$ref": "#/$defs/ts"
+        },
+        "drafted_at": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ts"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "posted_at": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ts"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "item",
+        "n",
+        "state",
+        "queue_reason",
+        "head_sha",
+        "base_ref",
+        "tier",
+        "tier_reasons",
+        "run_id",
+        "run_ids",
+        "phase",
+        "attempt",
+        "job_id",
+        "draft_id",
+        "revision",
+        "edited",
+        "reanchored",
+        "stale_reason",
+        "stale_head_sha",
+        "stale_since",
+        "escalated_since",
+        "failure",
+        "post_gate",
+        "approve_gate",
+        "auto_blocked_by",
+        "meta",
+        "post",
+        "post_error",
+        "hook_decision_ids",
+        "reject_reason",
+        "closed_reason",
+        "created_at",
+        "drafted_at",
+        "posted_at"
+      ],
+      "description": "One review of an item at one head sha."
+    },
+    "item": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/item_id"
+        },
+        "pr": {
+          "$ref": "#/$defs/pr"
+        },
+        "pr_id": {
+          "$ref": "#/$defs/pr_id"
+        },
+        "repo": {
+          "$ref": "#/$defs/repo_id"
+        },
+        "instance": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/instance"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "state": {
+          "$ref": "#/$defs/item_state"
+        },
+        "skip_reason": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/skip_reason"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rounds": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "latest_round": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/round"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "first_seen_at": {
+          "$ref": "#/$defs/ts"
+        },
+        "last_seen_at": {
+          "$ref": "#/$defs/ts"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "pr",
+        "pr_id",
+        "repo",
+        "instance",
+        "state",
+        "skip_reason",
+        "rounds",
+        "latest_round",
+        "first_seen_at",
+        "last_seen_at"
+      ],
+      "description": "One review request keyed by (pr_id, reviewer, instance). skip_reason is non-null exactly when state is skipped."
+    },
+    "revision": {
+      "type": "object",
+      "properties": {
+        "n": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "author": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/actor"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The human actor of an edit; null for revision 1 (review-run's artifact)."
+        },
+        "created_at": {
+          "$ref": "#/$defs/ts"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "n",
+        "sha256",
+        "size",
+        "author",
+        "created_at"
+      ]
+    },
+    "hook_record": {
+      "type": "object",
+      "properties": {
+        "hook": {
+          "$ref": "#/$defs/hook_name"
+        },
+        "ts": {
+          "$ref": "#/$defs/ts"
+        },
+        "exit_code": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "duration_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "timed_out": {
+          "type": "boolean"
+        },
+        "decision_ids": {
+          "$ref": "#/$defs/decision_ids"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "hook",
+        "ts",
+        "exit_code",
+        "duration_ms",
+        "timed_out",
+        "decision_ids"
+      ],
+      "description": "One hook result for the round, without output text."
+    },
+    "poll_host": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "$ref": "#/$defs/host"
+        },
+        "listed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "complete": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "snapshots": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "error": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/failure_code"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "host",
+        "listed",
+        "complete",
+        "snapshots",
+        "error"
+      ]
+    },
+    "poll_error": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/host"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "pr": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/pr"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "code": {
+          "$ref": "#/$defs/failure_code"
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 256,
+          "x-untrusted": true
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "host",
+        "pr",
+        "code",
+        "message"
+      ]
+    },
+    "poll_report": {
+      "type": "object",
+      "properties": {
+        "started_at": {
+          "$ref": "#/$defs/ts"
+        },
+        "finished_at": {
+          "$ref": "#/$defs/ts"
+        },
+        "hosts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/poll_host"
+          }
+        },
+        "discovered": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "new_items": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "skipped": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "out_of_scope": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "finalized": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "stale": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "closed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "started": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "queued": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/poll_error"
+          }
+        },
+        "already_running": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "started_at",
+        "finished_at",
+        "hosts",
+        "discovered",
+        "new_items",
+        "skipped",
+        "out_of_scope",
+        "finalized",
+        "stale",
+        "closed",
+        "started",
+        "queued",
+        "errors",
+        "already_running"
+      ],
+      "description": "The poll cycle's counts."
+    },
+    "error_body": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "$ref": "#/$defs/error_code"
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 512,
+          "x-untrusted": true,
+          "description": "Sanitized one-line text; may carry a lower tool's message."
+        },
+        "reason": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/error_reason"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "details": {
+          "type": "object",
+          "properties": {
+            "head_sha": {
+              "$ref": "#/$defs/sha"
+            },
+            "key": {
+              "type": "string",
+              "maxLength": 256
+            },
+            "required": {
+              "type": "string",
+              "maxLength": 32
+            },
+            "found": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "maxLength": 32
+            },
+            "install": {
+              "type": "string",
+              "maxLength": 256
+            }
+          },
+          "additionalProperties": true
+        },
+        "retry_after": {
+          "oneOf": [
+            {
+              "type": "number",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lower_tool": {
+          "oneOf": [
+            {
+              "enum": [
+                "forgectl",
+                "review-run",
+                "pr-comment",
+                "gatectl",
+                "jobsctl"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lower_code": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/failure_code"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lower_reason": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]{0,63}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "escalated_by": {
+          "oneOf": [
+            {
+              "enum": [
+                "pr-comment",
+                "forgectl",
+                "review-run"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "landed": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "retry": {
+          "enum": [
+            "same_command",
+            "new_key",
+            "none",
+            null
+          ]
+        },
+        "decision_ids": {
+          "$ref": "#/$defs/decision_ids"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "code": {
+                "const": "refused"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          },
+          "then": {
+            "required": [
+              "reason"
+            ],
+            "properties": {
+              "reason": {
+                "$ref": "#/$defs/refusal_reason"
+              }
+            }
+          }
+        }
+      ],
+      "description": "Only code and message are required."
+    }
+  }
+}

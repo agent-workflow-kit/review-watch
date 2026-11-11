@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review-watch/cli/edit.json",
+  "title": "edit --json",
+  "description": "revision is the latest revision after the command; changed is false and nothing was stored when the draft was unchanged.",
+  "type": "object",
+  "properties": {
+    "round": {
+      "$ref": "../defs.json#/$defs/round_id"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "changed": {
+      "type": "boolean"
+    },
+    "sha256": {
+      "$ref": "../defs.json#/$defs/sha256"
+    },
+    "size": {
+      "type": "integer",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "round",
+    "revision",
+    "changed",
+    "sha256",
+    "size"
+  ]
+}

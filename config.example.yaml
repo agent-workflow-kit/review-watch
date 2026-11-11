@@ -1,2 +1,144 @@
-# Example config for review-watch. Location: ~/.config/review-watch/config.yaml (drop-ins: config.d/*.yaml). Keys are defined in docs/interface.md once designed.
-hooks: {}
+# review-watch example configuration. Location: ~/.config/review-watch/config.yaml
+# (drop-ins in config.d/). Every key is shown with its default; delete what you do not change.
+# Precedence: flags > repos.<id> > environment > global > defaults. Unknown keys are refused.
+# Scalar keys can also be set as REVIEW_WATCH_<KEY> (nesting joined with __); lists,
+# hooks, repos and the tool commands cannot.
+
+# Hosts to poll. Required, no default; a missing or empty value exits 2.
+# Either a list, or a map that also pins the account login per host:
+#   hosts:
+#     git.example.com:
+#       me: my-login
+hosts:
+  - git.example.com
+
+# Repo-id globs (* within a path segment, ** across segments). exclude wins.
+include: ["*"]
+exclude: []
+
+# Your own account. Unset keys use the authenticated user reported by forgectl.
+me:
+  name: me           # used in the default actor human:<name>
+  # github: my-login
+  # gitlab: my-login
+
+max_rounds: 3        # rounds per PR across request instances; per-repo override allowed
+max_concurrent: 2    # detached review processes at once; only used without jobsctl
+max_attempts: 2      # runs per round before it fails
+
+jobs:
+  use_jobsctl: auto  # auto, true or false
+  queue: reviews     # jobsctl queue; needs kill_grace of at least 120s (125s with run_pr_code)
+  pass_env: []       # env var names for jobsctl --pass-env; values come from jobsctl's env file
+
+review:
+  skill: null        # review-run's default skill when null
+  mode: headless     # headless or interactive
+  previous: true     # pass --previous to review-run for round 2 and later
+
+# Risk tier thresholds. A per-repo override may only be lower (stricter), never higher.
+tiers:
+  lines: [50, 300]   # changed lines: above the first is tier 1, above the second tier 2
+  files: [3, 15]     # changed files: same
+  sensitive_globs: []   # paths that make a round at least tier 2; per-repo values add
+  trusted_authors: []   # logins treated as members on hosts without author associations
+  allow_forks: true     # false makes a fork PR tier 3
+
+# Paths that make a round tier 3 and block any automatic action. Per-repo values add
+# to this list and never remove from it.
+off_limits:
+  - ".github/**"
+  - ".gitlab-ci.yml"
+  - ".gitlab/**"
+  - ".circleci/**"
+  - "Jenkinsfile"
+  - "azure-pipelines.yml"
+  - "**/Dockerfile*"
+  - "Makefile"
+  - ".claude/**"
+  - ".mcp.json"
+  - "**/CLAUDE*.md"
+  - "**/AGENTS.md"
+  - "CODEOWNERS"
+  - ".github/CODEOWNERS"
+  - "docs/CODEOWNERS"
+  - "**/auth/**"
+  - "**/security/**"
+  - "**/secrets/**"
+  - "**/crypto/**"
+  - "**/*.pem"
+  - "**/*.key"
+  - ".env"
+  - ".env.*"
+
+# Highest tier at which an automatic post or approve is even considered (0 to 3).
+# Per-repo overrides may only be lower.
+max_post_tier: 1
+max_approve_tier: 0
+
+# Automatic actions are off by default and are enabled per repo (see repos below).
+# These global values are the defaults for a repo that does not set its own.
+auto_post:
+  enabled: false
+  policy: review-post      # gatectl policy
+auto_approve:
+  enabled: false
+  policy: review-approve   # gatectl policy; pr-comment also needs allow_auto_approve for the repo
+
+gate:
+  timeout: 60s       # gatectl check --timeout
+
+spend:
+  daily_cap_usd: null   # null is off; at the cap new rounds stay queued
+  timezone: null        # IANA zone name; null is the machine's local zone
+
+poll:
+  max_snapshots: 30        # snapshots per host and cycle
+  failure_alert_after: 3   # consecutive failing cycles before post-attention fires for a host
+
+retention:
+  closed: 90d        # prune deletes closed, rejected, posted and skipped items older than this
+
+cron:
+  schedule: "*/5 * * * *"
+  env_file: null     # sourced before poll in the cron line, for example /home/me/.config/review-watch/env
+
+# Sibling tool commands: an argv list run without a shell. Use absolute paths under cron.
+forgectl_cmd: [forgectl]
+review_run_cmd: [review-run]
+pr_comment_cmd: [pr-comment]
+gatectl_cmd: [gatectl]
+jobsctl_cmd: [jobsctl]
+
+# Hooks: pre-round (may veto with a non-zero exit, escalate with 13), post-draft,
+# post-attention, post-post. Each entry: cmd (run with sh -c), timeout in seconds
+# (default 30), async (post hooks only). Payloads are JSON on stdin and never hold text
+# from a host or a model.
+hooks:
+  pre-round: []
+  post-draft: []
+  post-attention: []
+  post-post: []
+  # post-attention:
+  #   - cmd: "notify-send review-watch"
+  #     timeout: 30
+  #     async: true
+
+# Per-repo overrides, keyed by repo id (host/<full project path>). Allowed keys: include,
+# exclude, max_rounds, tiers, max_post_tier, max_approve_tier, off_limits, auto_post,
+# auto_approve, review.skill.
+repos:
+  git.example.com/team/service:
+    max_rounds: 2
+    tiers:
+      lines: [40, 200]
+      sensitive_globs: ["migrations/**"]
+    max_post_tier: 1
+    off_limits: ["deploy/**"]
+    auto_post:
+      enabled: false
+      policy: review-post
+    auto_approve:
+      enabled: false
+    review:
+      skill: null

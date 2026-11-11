@@ -1,0 +1,315 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review-watch/hooks/post-attention.json",
+  "title": "post-attention hook payload (stdin)",
+  "description": "Something needs a human. Fires once per cause (per round, per item for round_limit, per host for poll_failed). No text.",
+  "type": "object",
+  "properties": {
+    "tool": {
+      "const": "review-watch"
+    },
+    "hook": {
+      "const": "post-attention"
+    },
+    "object_type": {
+      "enum": [
+        "round",
+        "item",
+        "host"
+      ]
+    },
+    "object_id": {
+      "anyOf": [
+        {
+          "$ref": "../defs.json#/$defs/round_id"
+        },
+        {
+          "$ref": "../defs.json#/$defs/item_id"
+        },
+        {
+          "$ref": "../defs.json#/$defs/host"
+        }
+      ]
+    },
+    "repo": {
+      "oneOf": [
+        {
+          "$ref": "../defs.json#/$defs/repo_id"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "labels": {
+      "$ref": "../defs.json#/$defs/labels",
+      "maxItems": 3,
+      "description": "rw-item, rw-round and pr as key=value strings."
+    },
+    "event_id": {
+      "type": "string",
+      "pattern": "^(?:rw-[a-z2-7]{8}(?:#[0-9]+)?|[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*(?::[0-9]{1,5})?)-(?:post-draft|post-attention)-[0-9]+$",
+      "description": "<id>-<hook>-<n>, the deduplication key."
+    },
+    "pr": {
+      "oneOf": [
+        {
+          "$ref": "../defs.json#/$defs/pr"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "item": {
+      "oneOf": [
+        {
+          "$ref": "../defs.json#/$defs/item_id"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "n": {
+      "oneOf": [
+        {
+          "type": "integer",
+          "minimum": 1
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "head_sha": {
+      "oneOf": [
+        {
+          "$ref": "../defs.json#/$defs/sha"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "reason": {
+      "$ref": "../defs.json#/$defs/attention_reason"
+    },
+    "details": {
+      "type": "object",
+      "properties": {
+        "failure_reason": {
+          "oneOf": [
+            {
+              "$ref": "../defs.json#/$defs/failure_reason"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "retryable": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "stale_reason": {
+          "oneOf": [
+            {
+              "$ref": "../defs.json#/$defs/stale_reason"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "host": {
+          "oneOf": [
+            {
+              "$ref": "../defs.json#/$defs/host"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "consecutive_failures": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "failure_reason",
+        "retryable",
+        "stale_reason",
+        "host",
+        "consecutive_failures"
+      ],
+      "description": "Closed codes, hosts and counts; never text."
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "tool",
+    "hook",
+    "object_type",
+    "object_id",
+    "repo",
+    "labels",
+    "event_id",
+    "pr",
+    "item",
+    "n",
+    "head_sha",
+    "reason",
+    "details"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "reason": {
+            "const": "poll_failed"
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
+      "then": {
+        "properties": {
+          "object_type": {
+            "const": "host"
+          },
+          "object_id": {
+            "$ref": "../defs.json#/$defs/host"
+          },
+          "labels": {
+            "maxItems": 0
+          },
+          "repo": {
+            "type": "null"
+          },
+          "pr": {
+            "type": "null"
+          },
+          "item": {
+            "type": "null"
+          }
+        }
+      },
+      "else": {
+        "if": {
+          "properties": {
+            "reason": {
+              "const": "round_limit"
+            }
+          },
+          "required": [
+            "reason"
+          ]
+        },
+        "then": {
+          "properties": {
+            "object_type": {
+              "const": "item"
+            },
+            "object_id": {
+              "$ref": "../defs.json#/$defs/item_id"
+            },
+            "item": {
+              "$ref": "../defs.json#/$defs/item_id"
+            },
+            "pr": {
+              "$ref": "../defs.json#/$defs/pr"
+            },
+            "repo": {
+              "$ref": "../defs.json#/$defs/repo_id"
+            }
+          },
+          "allOf": [
+            {
+              "properties": {
+                "labels": {
+                  "contains": {
+                    "type": "string",
+                    "pattern": "^rw-item=rw-[a-z2-7]{8}$"
+                  }
+                }
+              }
+            },
+            {
+              "properties": {
+                "labels": {
+                  "contains": {
+                    "type": "string",
+                    "pattern": "^pr=[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*(?::[0-9]{1,5})?(?:/(?!\\.\\.?(?:/|#))[A-Za-z0-9._-]+)+#[1-9][0-9]{0,9}$"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "else": {
+          "properties": {
+            "object_type": {
+              "const": "round"
+            },
+            "object_id": {
+              "$ref": "../defs.json#/$defs/round_id"
+            },
+            "item": {
+              "$ref": "../defs.json#/$defs/item_id"
+            },
+            "pr": {
+              "$ref": "../defs.json#/$defs/pr"
+            },
+            "n": {
+              "type": "integer"
+            },
+            "repo": {
+              "$ref": "../defs.json#/$defs/repo_id"
+            }
+          },
+          "allOf": [
+            {
+              "properties": {
+                "labels": {
+                  "contains": {
+                    "type": "string",
+                    "pattern": "^rw-item=rw-[a-z2-7]{8}$"
+                  }
+                }
+              }
+            },
+            {
+              "properties": {
+                "labels": {
+                  "contains": {
+                    "type": "string",
+                    "pattern": "^rw-round=[0-9]+$"
+                  }
+                }
+              }
+            },
+            {
+              "properties": {
+                "labels": {
+                  "contains": {
+                    "type": "string",
+                    "pattern": "^pr=[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*(?::[0-9]{1,5})?(?:/(?!\\.\\.?(?:/|#))[A-Za-z0-9._-]+)+#[1-9][0-9]{0,9}$"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

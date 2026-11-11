@@ -1,33 +1,563 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "review-watch/log",
+  "$id": "review-watch/log.json",
   "title": "review-watch log.jsonl record",
-  "type": "object",
-  "properties": {
-    "ts": {
-      "type": "string",
-      "format": "date-time"
-    },
-    "level": {
-      "type": "string",
-      "enum": [
-        "debug",
-        "info",
-        "warn",
-        "error"
+  "description": "Public, append-only. State transitions, poll cycles, gate calls, hook results, finalize steps and warnings. No text from a host or a model.",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "ts": {
+          "$ref": "defs.json#/$defs/ts"
+        },
+        "level": {
+          "enum": [
+            "debug",
+            "info",
+            "warn",
+            "error"
+          ]
+        },
+        "event": {
+          "const": "poll_cycle"
+        },
+        "started_at": {
+          "$ref": "defs.json#/$defs/poll_report/properties/started_at"
+        },
+        "finished_at": {
+          "$ref": "defs.json#/$defs/poll_report/properties/finished_at"
+        },
+        "discovered": {
+          "$ref": "defs.json#/$defs/poll_report/properties/discovered"
+        },
+        "new_items": {
+          "$ref": "defs.json#/$defs/poll_report/properties/new_items"
+        },
+        "skipped": {
+          "$ref": "defs.json#/$defs/poll_report/properties/skipped"
+        },
+        "out_of_scope": {
+          "$ref": "defs.json#/$defs/poll_report/properties/out_of_scope"
+        },
+        "finalized": {
+          "$ref": "defs.json#/$defs/poll_report/properties/finalized"
+        },
+        "stale": {
+          "$ref": "defs.json#/$defs/poll_report/properties/stale"
+        },
+        "closed": {
+          "$ref": "defs.json#/$defs/poll_report/properties/closed"
+        },
+        "started": {
+          "$ref": "defs.json#/$defs/poll_report/properties/started"
+        },
+        "queued": {
+          "$ref": "defs.json#/$defs/poll_report/properties/queued"
+        },
+        "already_running": {
+          "$ref": "defs.json#/$defs/poll_report/properties/already_running"
+        },
+        "hosts": {
+          "type": "array",
+          "items": {
+            "$ref": "defs.json#/$defs/poll_host"
+          }
+        },
+        "errors": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "forgectl_version": {
+          "type": "string",
+          "maxLength": 32
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "ts",
+        "level",
+        "event",
+        "started_at",
+        "finished_at",
+        "already_running"
       ]
     },
-    "event": {
-      "type": "string"
+    {
+      "type": "object",
+      "properties": {
+        "ts": {
+          "$ref": "defs.json#/$defs/ts"
+        },
+        "level": {
+          "enum": [
+            "debug",
+            "info",
+            "warn",
+            "error"
+          ]
+        },
+        "event": {
+          "const": "item_state"
+        },
+        "item": {
+          "$ref": "defs.json#/$defs/item_id"
+        },
+        "pr": {
+          "$ref": "defs.json#/$defs/pr"
+        },
+        "from": {
+          "oneOf": [
+            {
+              "$ref": "defs.json#/$defs/item_state"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "to": {
+          "$ref": "defs.json#/$defs/item_state"
+        },
+        "reason": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{0,63}$"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "ts",
+        "level",
+        "event",
+        "item",
+        "pr",
+        "from",
+        "to",
+        "reason"
+      ]
     },
-    "message": {
-      "type": "string"
+    {
+      "type": "object",
+      "properties": {
+        "ts": {
+          "$ref": "defs.json#/$defs/ts"
+        },
+        "level": {
+          "enum": [
+            "debug",
+            "info",
+            "warn",
+            "error"
+          ]
+        },
+        "event": {
+          "const": "round_state"
+        },
+        "round": {
+          "$ref": "defs.json#/$defs/round_id"
+        },
+        "from": {
+          "oneOf": [
+            {
+              "$ref": "defs.json#/$defs/round_state"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "to": {
+          "$ref": "defs.json#/$defs/round_state"
+        },
+        "reason": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{0,63}$"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "ts",
+        "level",
+        "event",
+        "round",
+        "from",
+        "to",
+        "reason"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "ts": {
+          "$ref": "defs.json#/$defs/ts"
+        },
+        "level": {
+          "enum": [
+            "debug",
+            "info",
+            "warn",
+            "error"
+          ]
+        },
+        "event": {
+          "const": "round_not_created"
+        },
+        "item": {
+          "$ref": "defs.json#/$defs/item_id"
+        },
+        "pr": {
+          "$ref": "defs.json#/$defs/pr"
+        },
+        "reason": {
+          "enum": [
+            "round_limit",
+            "hook_veto",
+            "spend_cap",
+            "capacity",
+            "pre_round_error"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "ts",
+        "level",
+        "event",
+        "item",
+        "pr",
+        "reason"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "ts": {
+          "$ref": "defs.json#/$defs/ts"
+        },
+        "level": {
+          "enum": [
+            "debug",
+            "info",
+            "warn",
+            "error"
+          ]
+        },
+        "event": {
+          "const": "gate_call"
+        },
+        "round": {
+          "$ref": "defs.json#/$defs/round_id"
+        },
+        "policy": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._:-]{1,64}$"
+        },
+        "decision_id": {
+          "oneOf": [
+            {
+              "$ref": "defs.json#/$defs/decision_id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "decision": {
+          "oneOf": [
+            {
+              "$ref": "defs.json#/$defs/gate_decision"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "enforced": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "exit_code": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "error": {
+          "oneOf": [
+            {
+              "enum": [
+                "gate_error"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "duration_ms": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "ts",
+        "level",
+        "event",
+        "round",
+        "policy",
+        "exit_code"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "ts": {
+          "$ref": "defs.json#/$defs/ts"
+        },
+        "level": {
+          "enum": [
+            "debug",
+            "info",
+            "warn",
+            "error"
+          ]
+        },
+        "event": {
+          "const": "hook_result"
+        },
+        "hook": {
+          "$ref": "defs.json#/$defs/hook_name"
+        },
+        "round": {
+          "oneOf": [
+            {
+              "$ref": "defs.json#/$defs/round_id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "exit_code": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "duration_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "timed_out": {
+          "type": "boolean"
+        },
+        "async": {
+          "type": "boolean"
+        },
+        "vetoed": {
+          "type": "boolean"
+        },
+        "decision_ids": {
+          "$ref": "defs.json#/$defs/decision_ids"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "ts",
+        "level",
+        "event",
+        "hook",
+        "exit_code",
+        "timed_out"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "ts": {
+          "$ref": "defs.json#/$defs/ts"
+        },
+        "level": {
+          "enum": [
+            "debug",
+            "info",
+            "warn",
+            "error"
+          ]
+        },
+        "event": {
+          "const": "finalize"
+        },
+        "round": {
+          "$ref": "defs.json#/$defs/round_id"
+        },
+        "step": {
+          "enum": [
+            "run_found",
+            "run_missing",
+            "drafted",
+            "escalated",
+            "failed",
+            "retry",
+            "job_resolved",
+            "run_canceled"
+          ]
+        },
+        "run_id": {
+          "oneOf": [
+            {
+              "$ref": "defs.json#/$defs/run_id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "attempt": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "ts",
+        "level",
+        "event",
+        "round",
+        "step"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "ts": {
+          "$ref": "defs.json#/$defs/ts"
+        },
+        "level": {
+          "enum": [
+            "debug",
+            "info",
+            "warn",
+            "error"
+          ]
+        },
+        "event": {
+          "const": "host_failed"
+        },
+        "host": {
+          "$ref": "defs.json#/$defs/host"
+        },
+        "code": {
+          "$ref": "defs.json#/$defs/failure_code"
+        },
+        "consecutive_failures": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "ts",
+        "level",
+        "event",
+        "host",
+        "code"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "ts": {
+          "$ref": "defs.json#/$defs/ts"
+        },
+        "level": {
+          "enum": [
+            "debug",
+            "info",
+            "warn",
+            "error"
+          ]
+        },
+        "event": {
+          "const": "gate_outcome"
+        },
+        "round": {
+          "$ref": "defs.json#/$defs/round_id"
+        },
+        "decision_id": {
+          "$ref": "defs.json#/$defs/decision_id"
+        },
+        "outcome": {
+          "$ref": "defs.json#/$defs/outcome"
+        },
+        "changed": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "error": {
+          "oneOf": [
+            {
+              "$ref": "defs.json#/$defs/failure_code"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "ts",
+        "level",
+        "event",
+        "round",
+        "decision_id",
+        "outcome"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "ts": {
+          "$ref": "defs.json#/$defs/ts"
+        },
+        "level": {
+          "enum": [
+            "debug",
+            "info",
+            "warn",
+            "error"
+          ]
+        },
+        "event": {
+          "const": "warning"
+        },
+        "code": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{0,63}$"
+        },
+        "key": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "round": {
+          "$ref": "defs.json#/$defs/round_id"
+        },
+        "pr": {
+          "$ref": "defs.json#/$defs/pr"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "ts",
+        "level",
+        "event",
+        "code"
+      ]
     }
-  },
-  "required": [
-    "ts",
-    "level",
-    "event"
-  ],
-  "additionalProperties": true
+  ]
 }

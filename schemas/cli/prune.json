@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review-watch/cli/prune.json",
+  "title": "prune --json",
+  "type": "object",
+  "properties": {
+    "older_than": {
+      "$ref": "../defs.json#/$defs/duration"
+    },
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "item": {
+            "$ref": "../defs.json#/$defs/item_id"
+          },
+          "result": {
+            "enum": [
+              "deleted",
+              "would_delete",
+              "skipped"
+            ]
+          },
+          "reason": {
+            "oneOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]{0,63}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "item",
+          "result",
+          "reason"
+        ]
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_]{0,63}$"
+      }
+    },
+    "dry_run": {
+      "type": "boolean"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "older_than",
+    "results",
+    "warnings",
+    "dry_run"
+  ]
+}

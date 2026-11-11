@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review-watch/cli/show-draft.json",
+  "title": "show --draft --json",
+  "description": "The stored draft revision as pr-comment's draft JSON, with no envelope. The whole document is untrusted; only the keys review-watch checks are named here and pr-comment's schema owns the rest.",
+  "type": "object",
+  "properties": {
+    "draft_id": {
+      "$ref": "../defs.json#/$defs/draft_id"
+    },
+    "schema_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "pr": {
+      "$ref": "../defs.json#/$defs/pr"
+    },
+    "anchor": {
+      "type": "object"
+    }
+  },
+  "required": [
+    "draft_id",
+    "pr",
+    "anchor"
+  ],
+  "additionalProperties": true,
+  "x-untrusted": true
+}

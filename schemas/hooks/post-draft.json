@@ -1,0 +1,178 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review-watch/hooks/post-draft.json",
+  "title": "post-draft hook payload (stdin)",
+  "description": "A round reached drafted. Post hook: runs after the transition committed, at most once. No draft text.",
+  "type": "object",
+  "properties": {
+    "tool": {
+      "const": "review-watch"
+    },
+    "hook": {
+      "const": "post-draft"
+    },
+    "object_type": {
+      "const": "round"
+    },
+    "object_id": {
+      "$ref": "../defs.json#/$defs/round_id"
+    },
+    "repo": {
+      "$ref": "../defs.json#/$defs/repo_id"
+    },
+    "labels": {
+      "$ref": "../defs.json#/$defs/labels",
+      "maxItems": 3,
+      "description": "rw-item, rw-round and pr as key=value strings."
+    },
+    "event_id": {
+      "type": "string",
+      "pattern": "^(?:rw-[a-z2-7]{8}(?:#[0-9]+)?|[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*(?::[0-9]{1,5})?)-(?:post-draft|post-attention)-[0-9]+$",
+      "description": "<id>-<hook>-<n>, the deduplication key."
+    },
+    "pr": {
+      "$ref": "../defs.json#/$defs/pr"
+    },
+    "item": {
+      "$ref": "../defs.json#/$defs/item_id"
+    },
+    "n": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "head_sha": {
+      "$ref": "../defs.json#/$defs/sha"
+    },
+    "draft_id": {
+      "$ref": "../defs.json#/$defs/draft_id"
+    },
+    "tier": {
+      "$ref": "../defs.json#/$defs/tier"
+    },
+    "verdict": {
+      "oneOf": [
+        {
+          "$ref": "../defs.json#/$defs/verdict"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "severity_counts": {
+      "oneOf": [
+        {
+          "$ref": "../defs.json#/$defs/severity_counts"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "coverage_status": {
+      "oneOf": [
+        {
+          "$ref": "../defs.json#/$defs/coverage_status"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "auto_blocked_by": {
+      "type": "array",
+      "items": {
+        "$ref": "../defs.json#/$defs/auto_blocked_code"
+      },
+      "uniqueItems": true
+    },
+    "post_gate_decision": {
+      "oneOf": [
+        {
+          "$ref": "../defs.json#/$defs/gate_decision"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "post_gate_enforced": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "approve_gate_decision": {
+      "oneOf": [
+        {
+          "$ref": "../defs.json#/$defs/gate_decision"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "approve_gate_enforced": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "tool",
+    "hook",
+    "object_type",
+    "object_id",
+    "repo",
+    "labels",
+    "event_id",
+    "pr",
+    "item",
+    "n",
+    "head_sha",
+    "draft_id",
+    "tier",
+    "verdict",
+    "severity_counts",
+    "coverage_status",
+    "auto_blocked_by",
+    "post_gate_decision",
+    "post_gate_enforced",
+    "approve_gate_decision",
+    "approve_gate_enforced"
+  ],
+  "allOf": [
+    {
+      "properties": {
+        "labels": {
+          "contains": {
+            "type": "string",
+            "pattern": "^rw-item=rw-[a-z2-7]{8}$"
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "labels": {
+          "contains": {
+            "type": "string",
+            "pattern": "^rw-round=[0-9]+$"
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "labels": {
+          "contains": {
+            "type": "string",
+            "pattern": "^pr=[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*(?::[0-9]{1,5})?(?:/(?!\\.\\.?(?:/|#))[A-Za-z0-9._-]+)+#[1-9][0-9]{0,9}$"
+          }
+        }
+      }
+    }
+  ]
+}
