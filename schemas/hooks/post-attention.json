@@ -166,14 +166,17 @@
                 "schema_newer",
                 "state_unsafe",
                 "plugin_changed",
-                "pass_env_undefined"
+                "pass_env_undefined",
+                "quick_action_ran",
+                "approved_stale_head",
+                "audit_failed"
               ]
             },
             {
               "type": "null"
             }
           ],
-          "description": "For submit_failed: the blocking code."
+          "description": "For submit_failed: the blocking code; for post_failed after an automatic post that landed with a warning: that warning."
         },
         "waiting": {
           "type": [

@@ -44,14 +44,15 @@ tiers:
   lines: [50, 300]   # changed lines: above the first is tier 1, above the second tier 2
   files: [3, 15]     # changed files: same
   sensitive_globs: []   # paths that make a round at least tier 2; per-repo values add
-  trusted_authors: []   # logins (case-insensitive): tier rule where author_association is null (GitLab); on either host they also let the author start a round; global only
+  trusted_authors: []   # logins (case-insensitive): tier rule where author_association is null (GitLab); on either host they also let the author start a round; global only; a login can be re-registered after an account is released, so prune this list
   allow_forks: true     # false makes a fork PR tier 3; a per-repo value may only be false
 
 # Paths that make a round tier 3 and block any automatic action. A pattern without a
 # slash matches the last path segment at any depth; a pattern with a slash is anchored at
 # the repo root; a ** segment matches zero or more whole segments; ASCII case is folded.
 # Patterns are validated at load (no empty, . or .. segment, no leading slash, at most 256
-# characters). Per-repo values add to this list and never remove from it.
+# characters, only letters, digits and . _ * ? / : @ + -, so no [ ] { } or backslash). The
+# nested editor, agent and hook directories are any-depth (**/); host CI files stay anchored. Per-repo values add to this list and never remove from it.
 off_limits:
   - ".github/**"
   - ".gitlab-ci.yml"
@@ -63,18 +64,23 @@ off_limits:
   - "docker-compose*"
   - "Makefile"
   - "GNUmakefile"
-  - ".husky/**"
+  - "**/.husky/**"
   - ".pre-commit-config.yaml"
   - ".gitmodules"
   - "**/.claude/**"
+  - "**/.cursor/**"
+  - "**/.gemini/**"
+  - "**/.codex/**"
   - ".mcp.json"
   - "CLAUDE*.md"
   - "AGENTS.md"
   - "GEMINI.md"
-  - ".cursor/**"
   - ".cursorrules"
-  - ".vscode/**"
-  - ".devcontainer/**"
+  - ".windsurfrules"
+  - ".clinerules"
+  - "**/.vscode/**"
+  - "**/.devcontainer/**"
+  - "**/.zed/**"
   - ".envrc"
   - ".gitattributes"
   - "CODEOWNERS"

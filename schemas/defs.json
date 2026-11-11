@@ -859,7 +859,15 @@
         },
         "uncertain": {
           "type": "boolean",
-          "description": "True once a result could have landed; then only posted, rejected or closed can follow."
+          "description": "True once a result could have landed (or a crash lost one); then only posted, rejected or closed can follow."
+        },
+        "attempts": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "pr-comment review write calls started for this intent; incremented, with call_started_at, in the compare-and-set that takes the lease for each call, before the child is spawned. Dry runs do not count."
+        },
+        "call_started_at": {
+          "$ref": "#/$defs/ts"
         },
         "started_at": {
           "$ref": "#/$defs/ts"
@@ -876,6 +884,8 @@
         "plan_sha256",
         "automatic",
         "uncertain",
+        "attempts",
+        "call_started_at",
         "started_at"
       ],
       "description": "Stored by the compare-and-set that moves a round to posting. The fixed fields are revision, revision_sha256, approve and the draft id; actor, decision_ids, reanchor_to, plan_sha256 and automatic are rewritten only in the compare-and-set that takes the round's lease for a new attempt."

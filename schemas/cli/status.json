@@ -113,6 +113,13 @@
                   "host": {
                     "$ref": "../defs.json#/$defs/host"
                   },
+                  "complete": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ],
+                    "description": "Whether the listing was complete; false means nothing was inferred from it."
+                  },
                   "error": {
                     "oneOf": [
                       {
@@ -135,6 +142,7 @@
                 "additionalProperties": false,
                 "required": [
                   "host",
+                  "complete",
                   "error",
                   "consecutive_failures",
                   "snapshots_deferred"
