@@ -75,6 +75,10 @@
           ],
           "maxLength": 64
         },
+        "intent_decision_ids": {
+          "$ref": "defs.json#/$defs/decision_ids",
+          "description": "The decision ids of the post intent a human accept completed; audited only, never passed to pr-comment."
+        },
         "actor_source": {
           "enum": [
             "flag",
@@ -155,6 +159,29 @@
               "oneOf": [
                 {
                   "$ref": "defs.json#/$defs/outcome"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "lower_code": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]{0,63}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "pr-comment's error.code when an accept or auto_post ended in a pr-comment failure."
+            },
+            "lower_reason": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]{0,63}$"
                 },
                 {
                   "type": "null"
@@ -269,6 +296,29 @@
                 "oneOf": [
                   {
                     "$ref": "defs.json#/$defs/outcome"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "lower_code": {
+                "oneOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9_]{0,63}$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "pr-comment's error.code when an accept or auto_post ended in a pr-comment failure."
+              },
+              "lower_reason": {
+                "oneOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9_]{0,63}$"
                   },
                   {
                     "type": "null"

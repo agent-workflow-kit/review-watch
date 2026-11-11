@@ -57,6 +57,9 @@
         "already_running": {
           "$ref": "defs.json#/$defs/poll_report/properties/already_running"
         },
+        "deadline_hit": {
+          "$ref": "defs.json#/$defs/poll_report/properties/deadline_hit"
+        },
         "hosts": {
           "type": "array",
           "items": {
@@ -171,6 +174,10 @@
         "reason": {
           "type": "string",
           "pattern": "^[a-z][a-z0-9_]{0,63}$"
+        },
+        "tier": {
+          "$ref": "defs.json#/$defs/tier",
+          "description": "The round's stored tier at this transition (the creation tier at creation)."
         }
       },
       "additionalProperties": false,
@@ -245,8 +252,7 @@
           "$ref": "defs.json#/$defs/round_id"
         },
         "policy": {
-          "type": "string",
-          "pattern": "^[A-Za-z0-9._:-]{1,64}$"
+          "$ref": "defs.json#/$defs/policy_name"
         },
         "decision_id": {
           "oneOf": [

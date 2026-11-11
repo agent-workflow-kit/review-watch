@@ -99,9 +99,9 @@
     "glob": {
       "type": "string",
       "minLength": 1,
-      "maxLength": 512,
-      "pattern": "^[A-Za-z0-9._*?/:@+-]+$",
-      "description": "A repo-id or path glob (Path matching in docs/interface.md: * and ? within a segment, a ** segment across directories)."
+      "maxLength": 256,
+      "pattern": "^(?!/)(?!.*/$)(?!.*//)(?!(?:.*/)?\\.\\.?(?:/|$))(?!.*[^/]\\*\\*)(?!.*\\*\\*[^/])(?!.*(?:^|/)(?:[^/*]*\\*){4})(?!(?:.*?(?:^|/)\\*\\*(?:/|$)){4})[A-Za-z0-9._*?/:@+-]+$",
+      "description": "A repo-id or path glob (Path matching in docs/interface.md): * and ? match within a segment, a ** segment matches zero or more whole segments. Validated at load: no empty segment, no leading slash, no . or .. segment, ** only as a whole segment, at most three * in a segment and three ** in a pattern, at most 256 characters."
     },
     "login": {
       "type": "string",
@@ -163,6 +163,7 @@
         "bot_author",
         "bot_unknown",
         "own_pr",
+        "author_external",
         "already_reviewed",
         "hook_veto"
       ]
@@ -314,11 +315,13 @@
         "round_active",
         "round_busy",
         "round_limit",
-        "daily_limit",
         "stale_head",
         "retargeted",
         "revision_changed",
         "item_closed",
+        "needs_new_draft",
+        "not_rerunnable",
+        "not_rejectable",
         "stale_base",
         "plan_changed",
         "auto_approve_disabled",
@@ -342,11 +345,13 @@
         "round_active",
         "round_busy",
         "round_limit",
-        "daily_limit",
         "stale_head",
         "retargeted",
         "revision_changed",
         "item_closed",
+        "needs_new_draft",
+        "not_rerunnable",
+        "not_rejectable",
         "stale_base",
         "plan_changed",
         "auto_approve_disabled",
@@ -378,6 +383,49 @@
       "type": "string",
       "pattern": "^[a-z][a-z0-9_]{0,63}$",
       "description": "A forgectl or review-watch error code, passed through."
+    },
+    "pr_comment_error_code": {
+      "enum": [
+        "internal",
+        "usage",
+        "config_invalid",
+        "invalid_pr",
+        "invalid_draft",
+        "invalid_text",
+        "unsupported_draft_version",
+        "draft_pr_mismatch",
+        "approve_conflicts_event",
+        "body_too_large",
+        "not_found",
+        "vetoed",
+        "tool_missing",
+        "lower_contract_mismatch",
+        "audit_unavailable",
+        "audit_failed",
+        "state_unsafe",
+        "invalid_position",
+        "outcome_unknown",
+        "outcome_partial",
+        "quick_action_ran",
+        "approved_stale_head",
+        "auth_required",
+        "permission_denied",
+        "rate_limited",
+        "upstream_error",
+        "network_error",
+        "host_rejected",
+        "unsupported_host_version",
+        "wrong_host_response",
+        "confirmation_required",
+        "escalated",
+        "refused"
+      ],
+      "description": "A copy of pr-comment's error.code enum, pinned to pr-comment's version; it holds codes review-watch's own error_code does not."
+    },
+    "policy_name": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$",
+      "description": "gatectl's policy name grammar; also valid inside the actor auto:<policy>."
     },
     "verdict": {
       "enum": [
@@ -488,7 +536,8 @@
         "re_request",
         "skip_cleared",
         "rerun"
-      ]
+      ],
+      "description": "re_request: a posted item whose request is outstanding again after its latest round posted (both hosts); skip_cleared: a skipped item whose condition cleared; rerun: a human rerun."
     },
     "hook_name": {
       "enum": [
@@ -547,8 +596,7 @@
       "type": "object",
       "properties": {
         "policy": {
-          "type": "string",
-          "pattern": "^[A-Za-z0-9._:-]{1,64}$"
+          "$ref": "#/$defs/policy_name"
         },
         "decision_id": {
           "oneOf": [
@@ -613,7 +661,7 @@
         "attempts": {
           "type": "integer",
           "minimum": 0,
-          "description": "Calls made for this policy; a gate_error is retried on the next three cycles."
+          "description": "Calls made for this policy; a gate_error allows at most 3 calls in total per round and policy."
         },
         "outcome": {
           "oneOf": [
@@ -644,103 +692,6 @@
         "checked_at"
       ],
       "description": "A gate record: the policy, the decision id, the would-be decision, the enforced flag and what the call reported."
-    },
-    "meta": {
-      "type": "object",
-      "properties": {
-        "verdict": {
-          "oneOf": [
-            {
-              "$ref": "#/$defs/verdict"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "severity_counts": {
-          "oneOf": [
-            {
-              "$ref": "#/$defs/severity_counts"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "risk": {
-          "oneOf": [
-            {
-              "$ref": "#/$defs/risk"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "coverage_status": {
-          "oneOf": [
-            {
-              "$ref": "#/$defs/coverage_status"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "code_run_status": {
-          "oneOf": [
-            {
-              "$ref": "#/$defs/code_run_status"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "head_moved": {
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "sandbox": {
-          "oneOf": [
-            {
-              "$ref": "#/$defs/sandbox_level"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "tools_checked": {
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "tools_unexpected": {
-          "type": [
-            "integer",
-            "null"
-          ],
-          "minimum": 0
-        }
-      },
-      "additionalProperties": false,
-      "required": [
-        "verdict",
-        "severity_counts",
-        "risk",
-        "coverage_status",
-        "code_run_status",
-        "head_moved",
-        "sandbox",
-        "tools_checked",
-        "tools_unexpected"
-      ],
-      "description": "The run summary fields copied onto the round. Claims; the closed fields never authorize anything."
     },
     "post_result": {
       "type": "object",
@@ -814,18 +765,26 @@
     "post_error": {
       "type": "object",
       "properties": {
+        "exit_code": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
         "code": {
-          "$ref": "#/$defs/error_code"
+          "$ref": "#/$defs/pr_comment_error_code"
         },
         "reason": {
           "oneOf": [
             {
-              "$ref": "#/$defs/error_reason"
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]{0,63}$"
             },
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "pr-comment's error.reason, checked against its refusal grammar."
         },
         "landed": {
           "type": [
@@ -847,13 +806,14 @@
       },
       "additionalProperties": false,
       "required": [
+        "exit_code",
         "code",
         "reason",
         "landed",
         "retry",
         "at"
       ],
-      "description": "Set while a round is posting after a failure; running the same accept again is the answer."
+      "description": "The last pr-comment failure of this intent (Post intent and recovery in docs/interface.md)."
     },
     "post_intent": {
       "type": "object",
@@ -897,30 +857,12 @@
         "automatic": {
           "type": "boolean"
         },
+        "uncertain": {
+          "type": "boolean",
+          "description": "True once a result could have landed; then only posted, rejected or closed can follow."
+        },
         "started_at": {
           "$ref": "#/$defs/ts"
-        },
-        "holder": {
-          "type": "object",
-          "properties": {
-            "pid": {
-              "type": "integer",
-              "minimum": 1
-            },
-            "process_started_at": {
-              "$ref": "#/$defs/ts"
-            },
-            "expires_at": {
-              "$ref": "#/$defs/ts"
-            }
-          },
-          "additionalProperties": false,
-          "required": [
-            "pid",
-            "process_started_at",
-            "expires_at"
-          ],
-          "description": "PID plus process start time plus a 15-minute expiry renewed while the call runs."
         }
       },
       "additionalProperties": false,
@@ -933,10 +875,10 @@
         "decision_ids",
         "plan_sha256",
         "automatic",
-        "started_at",
-        "holder"
+        "uncertain",
+        "started_at"
       ],
-      "description": "Stored by the compare-and-set that moves a round to posting; every later attempt uses exactly this intent."
+      "description": "Stored by the compare-and-set that moves a round to posting. The fixed fields are revision, revision_sha256, approve and the draft id; actor, decision_ids, reanchor_to, plan_sha256 and automatic are rewritten only in the compare-and-set that takes the round's lease for a new attempt."
     },
     "round": {
       "type": "object",
@@ -973,10 +915,7 @@
         },
         "tier": {
           "$ref": "#/$defs/tier",
-          "description": "The gate's tier once drafted (computed from facts bound to the draft's head), else the creation tier."
-        },
-        "tier_at_creation": {
-          "$ref": "#/$defs/tier"
+          "description": "One stored tier: the creation tier until drafted (when an automatic action is enabled the bound tier replaces it), then the tier bound to the draft's head."
         },
         "tier_reasons": {
           "type": "array",
@@ -1015,7 +954,7 @@
         "attempt": {
           "type": "integer",
           "minimum": 0,
-          "description": "The number of runs started for the round."
+          "description": "The number of launches of the round, except blocked launches (Run outcomes)."
         },
         "session_launched": {
           "type": "boolean",
@@ -1112,6 +1051,39 @@
             }
           ]
         },
+        "escalations": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Escalation episodes: each entry of the round into escalated, and each held creation."
+        },
+        "launch_override": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "actor": {
+                  "$ref": "#/$defs/actor"
+                },
+                "at": {
+                  "$ref": "#/$defs/ts"
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "actor",
+                "at"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Stored by resume of a pre_run escalation; poll launches with --override-escalation and this actor until a run exists."
+        },
+        "limit_exempt": {
+          "type": "boolean",
+          "description": "Set by rerun --force: the round neither counts toward the daily limit nor waits for it."
+        },
         "not_before": {
           "oneOf": [
             {
@@ -1174,7 +1146,7 @@
         "meta": {
           "oneOf": [
             {
-              "$ref": "#/$defs/meta"
+              "$ref": "#/$defs/meta_review_run"
             },
             {
               "type": "null"
@@ -1238,6 +1210,9 @@
         "created_at": {
           "$ref": "#/$defs/ts"
         },
+        "updated_at": {
+          "$ref": "#/$defs/ts"
+        },
         "drafted_at": {
           "oneOf": [
             {
@@ -1269,7 +1244,6 @@
         "head_sha",
         "base_ref",
         "tier",
-        "tier_at_creation",
         "tier_reasons",
         "run_id",
         "run_ids",
@@ -1286,6 +1260,9 @@
         "stale_since",
         "escalated_since",
         "escalation_kind",
+        "escalations",
+        "launch_override",
+        "limit_exempt",
         "not_before",
         "last_failure",
         "failure",
@@ -1301,6 +1278,7 @@
         "reject_reason",
         "closed_reason",
         "created_at",
+        "updated_at",
         "drafted_at",
         "posted_at"
       ],
@@ -1380,6 +1358,9 @@
         },
         "last_seen_at": {
           "$ref": "#/$defs/ts"
+        },
+        "updated_at": {
+          "$ref": "#/$defs/ts"
         }
       },
       "additionalProperties": false,
@@ -1397,7 +1378,8 @@
         "rounds",
         "latest_round",
         "first_seen_at",
-        "last_seen_at"
+        "last_seen_at",
+        "updated_at"
       ],
       "description": "One review request keyed by (pr_id, reviewer, instance). skip_reason is non-null exactly when state is skipped.",
       "allOf": [
@@ -1436,6 +1418,13 @@
           "type": "integer",
           "minimum": 1
         },
+        "kind": {
+          "enum": [
+            "draft",
+            "edit",
+            "reanchor"
+          ]
+        },
         "sha256": {
           "$ref": "#/$defs/sha256"
         },
@@ -1452,7 +1441,7 @@
               "type": "null"
             }
           ],
-          "description": "The human actor of an edit; null for revision 1 (review-run's artifact)."
+          "description": "Null for kind draft (review-run's artifact); the human actor for edit and reanchor."
         },
         "created_at": {
           "$ref": "#/$defs/ts"
@@ -1461,6 +1450,7 @@
       "additionalProperties": false,
       "required": [
         "n",
+        "kind",
         "sha256",
         "size",
         "author",
@@ -1580,6 +1570,18 @@
           "type": "string",
           "maxLength": 256,
           "x-untrusted": true
+        },
+        "details": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string",
+              "maxLength": 256
+            }
+          },
+          "additionalProperties": false,
+          "required": [],
+          "description": "Optional; for config_invalid the key at fault (for example forgectl me)."
         }
       },
       "additionalProperties": false,
@@ -1649,6 +1651,10 @@
         },
         "already_running": {
           "type": "boolean"
+        },
+        "deadline_hit": {
+          "type": "boolean",
+          "description": "True when poll.deadline ended the cycle."
         }
       },
       "additionalProperties": false,
@@ -1666,7 +1672,8 @@
         "started",
         "queued",
         "errors",
-        "already_running"
+        "already_running",
+        "deadline_hit"
       ],
       "description": "The poll cycle's counts, each for this cycle: discovered (listed candidates in scope), new_items, skipped (items that became skipped), out_of_scope, finalized, stale, closed, started, queued (rounds left queued). With already_running true the counts are zero and started_at equals finished_at."
     },
@@ -1872,6 +1879,730 @@
         }
       ],
       "description": "Only code and message are required."
+    },
+    "meta_review_run": {
+      "title": "review-run meta.review_run object",
+      "description": "review-run's meta.review_run object as stored on the round (pinned copy of review-run's schemas/meta.json and the defs it needs, prefixed rr_). The value of the draft's meta.review_run key (the draft's meta object holds exactly that one key). Every text field is untrusted, and meta is untrusted text downstream. A consumer treats coverage.status partial, code_run.status skipped (when it expected output), head_moved true, session.sandbox other than required, session.tools_checked false and a non-zero session.tools_unexpected as reasons not to act automatically.",
+      "type": "object",
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "run_id": {
+          "$ref": "#/$defs/rr_run_id"
+        },
+        "skill": {
+          "$ref": "#/$defs/rr_skill"
+        },
+        "skill_version": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 64,
+          "description": "The bundled plugin's version for the default skill, else null."
+        },
+        "skill_checked": {
+          "type": "boolean",
+          "description": "true when the skill check ran (headless); false when it did not (interactive, with the run warning skill_unchecked)."
+        },
+        "mode": {
+          "$ref": "#/$defs/rr_mode"
+        },
+        "session": {
+          "type": "object",
+          "properties": {
+            "sandbox": {
+              "enum": [
+                "required",
+                "preferred",
+                "off"
+              ],
+              "description": "The session sandbox level from settings.json."
+            },
+            "profile": {
+              "enum": [
+                "bundled",
+                "variant",
+                "custom"
+              ],
+              "description": "bundled, variant (the bundled profile without the Agent and Task denies) or custom (a configured permission_profile)."
+            },
+            "profile_sha256": {
+              "$ref": "#/$defs/rr_sha256",
+              "description": "SHA-256 of the run's permission-profile.json."
+            },
+            "tools_checked": {
+              "type": "boolean",
+              "description": "true when the init tools list was compared with the pinned set (headless run, bundled profile or its variant)."
+            },
+            "tools_unexpected": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "How many tools outside the pinned set the init list held; never their names. 0 when the tools were not checked."
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "sandbox",
+            "profile",
+            "profile_sha256",
+            "tools_checked",
+            "tools_unexpected"
+          ],
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "tools_checked": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "tools_checked"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "tools_unexpected": {
+                    "const": 0
+                  }
+                }
+              }
+            }
+          ],
+          "description": "The session posture, from the run's settings.json and permission-profile.json and finalize step 5."
+        },
+        "verdict": {
+          "$ref": "#/$defs/rr_verdict",
+          "x-untrusted": true
+        },
+        "risk": {
+          "$ref": "#/$defs/rr_risk",
+          "x-untrusted": true
+        },
+        "risk_reasons": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "x-untrusted": true,
+            "description": "Untrusted: a short reason, one line.",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f\\u00ad\\u034f\\u115f\\u1160\\u2028\\u2029\\u200b-\\u200f\\u202a-\\u202e\\u2060-\\u206f\\u3164\\ufe00-\\ufe0f\\ufeff\\uffa0\\u00a0\\u1680\\u2000-\\u200a\\u202f\\u205f\\u3000\\u17b4\\u17b5\\u180b-\\u180d\\u180f\\u2800]*$"
+          },
+          "maxItems": 10,
+          "x-untrusted": true,
+          "description": "Untrusted: the session's reasons, at most 10 one-line strings of 1 to 200 characters."
+        },
+        "summary": {
+          "type": "string",
+          "x-untrusted": true,
+          "description": "Untrusted: the session's summary, 1 to 2000 characters.",
+          "minLength": 1,
+          "maxLength": 2000,
+          "pattern": "^[^\\u0000-\\u0008\\u000b-\\u001f\\u007f-\\u009f\\u00ad\\u034f\\u115f\\u1160\\u2028\\u2029\\u200b-\\u200f\\u202a-\\u202e\\u2060-\\u206f\\u3164\\ufe00-\\ufe0f\\ufeff\\uffa0\\u00a0\\u1680\\u2000-\\u200a\\u202f\\u205f\\u3000\\u17b4\\u17b5\\u180b-\\u180d\\u180f\\u2800]*$"
+        },
+        "severity_counts": {
+          "$ref": "#/$defs/rr_severity_counts"
+        },
+        "coverage": {
+          "$ref": "#/$defs/rr_coverage"
+        },
+        "pr": {
+          "$ref": "#/$defs/rr_pr_facts"
+        },
+        "code_run": {
+          "$ref": "#/$defs/rr_code_run"
+        },
+        "head_at_end": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/rr_sha"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "null when the end-of-run read failed."
+        },
+        "head_moved": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "description": "null when the end-of-run read failed."
+        },
+        "normalized": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/rr_normalized_entry"
+          },
+          "maxItems": 201
+        },
+        "previous_run": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/rr_run_id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "run_id",
+        "skill",
+        "skill_version",
+        "skill_checked",
+        "mode",
+        "session",
+        "verdict",
+        "risk",
+        "risk_reasons",
+        "summary",
+        "severity_counts",
+        "coverage",
+        "pr",
+        "code_run",
+        "head_at_end",
+        "head_moved",
+        "normalized",
+        "previous_run"
+      ]
+    },
+    "rr_run_id": {
+      "type": "string",
+      "pattern": "^rr-[a-z2-7]{8}$",
+      "description": "rr- plus 8 lowercase base32 characters (a-z2-7); never reused."
+    },
+    "rr_normalized_entry": {
+      "type": "object",
+      "properties": {
+        "rule": {
+          "enum": [
+            "drop_unknown",
+            "drop_null",
+            "drop_unanchored",
+            "event_downgrade",
+            "truncated"
+          ]
+        },
+        "pointer": {
+          "type": "string",
+          "x-untrusted": true,
+          "description": "Untrusted: the JSON pointer of the parent object the rule applied to; never a dropped key name.",
+          "maxLength": 1024
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "rule",
+        "pointer",
+        "count"
+      ],
+      "description": "At most 200 entries are kept, then one entry with rule truncated and pointer empty (count: the entries omitted)."
+    },
+    "rr_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$",
+      "description": "Full 40-hex commit sha, lowercase."
+    },
+    "rr_code_run": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "$ref": "#/$defs/rr_code_run_status"
+        },
+        "reason": {
+          "enum": [
+            "wtctl_missing",
+            "throwaway_refused",
+            "ref_unavailable",
+            "throwaway_failed",
+            "sandbox_unavailable",
+            "sandbox_unsupported",
+            "sandbox_failed",
+            "ro_bind_refused",
+            "throwaway_leaks",
+            null
+          ],
+          "description": "Set exactly when status is skipped."
+        },
+        "exit_code": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "null with a signal, when skipped and when not configured."
+        },
+        "signal": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^SIG[A-Z0-9]+$",
+          "description": "The terminating signal name, else null."
+        },
+        "timed_out": {
+          "type": "boolean"
+        },
+        "truncated": {
+          "type": "boolean"
+        },
+        "bytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "duration_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "sandbox": {
+          "enum": [
+            "required",
+            "preferred",
+            "off",
+            null
+          ],
+          "description": "The mode the command ran in; null when it did not run."
+        },
+        "output_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/rr_sha256"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "SHA-256 of the sanitized output; null when it did not run."
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "reason",
+        "exit_code",
+        "signal",
+        "timed_out",
+        "truncated",
+        "bytes",
+        "duration_ms",
+        "sandbox",
+        "output_sha256"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "skipped"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "reason": {
+                "type": "string"
+              },
+              "exit_code": {
+                "type": "null"
+              },
+              "signal": {
+                "type": "null"
+              },
+              "timed_out": {
+                "const": false
+              },
+              "truncated": {
+                "const": false
+              },
+              "bytes": {
+                "type": "null"
+              },
+              "duration_ms": {
+                "type": "null"
+              },
+              "sandbox": {
+                "type": "null"
+              },
+              "output_sha256": {
+                "type": "null"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "reason": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "not_configured"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "exit_code": {
+                "type": "null"
+              },
+              "signal": {
+                "type": "null"
+              },
+              "timed_out": {
+                "const": false
+              },
+              "truncated": {
+                "const": false
+              },
+              "bytes": {
+                "type": "null"
+              },
+              "duration_ms": {
+                "type": "null"
+              },
+              "sandbox": {
+                "type": "null"
+              },
+              "output_sha256": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "ok",
+                  "failed"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "bytes": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "duration_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "sandbox": {
+                "type": "string"
+              },
+              "output_sha256": {
+                "$ref": "#/$defs/rr_sha256"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "ok"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "exit_code": {
+                "const": 0
+              },
+              "signal": {
+                "type": "null"
+              },
+              "timed_out": {
+                "const": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "failed"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "anyOf": [
+              {
+                "properties": {
+                  "exit_code": {
+                    "type": "integer",
+                    "not": {
+                      "const": 0
+                    }
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "signal": {
+                    "type": "string"
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "timed_out": {
+                    "const": true
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "description": "The code-run step's summary. status failed means a non-zero exit, a signal or a timeout; timed_out and truncated are independent booleans. The output itself is stored in the run directory, not here."
+    },
+    "rr_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "rr_code_run_status": {
+      "enum": [
+        "ok",
+        "failed",
+        "skipped",
+        "not_configured"
+      ]
+    },
+    "rr_pr_facts": {
+      "type": "object",
+      "properties": {
+        "draft": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "is_bot": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "is_fork": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "base_is_default": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "draft",
+        "is_bot",
+        "is_fork",
+        "base_is_default"
+      ],
+      "description": "From forgectl; each possibly null."
+    },
+    "rr_coverage": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "enum": [
+            "full",
+            "partial"
+          ]
+        },
+        "reviewed": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/rr_file_id"
+          },
+          "uniqueItems": true,
+          "maxItems": 9999,
+          "description": "The session's file ids intersected with the provided entries."
+        },
+        "skipped": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "file": {
+                "$ref": "#/$defs/rr_file_id"
+              },
+              "reason": {
+                "enum": [
+                  "size_cap",
+                  "file_cap",
+                  "truncated",
+                  "not_reviewed"
+                ]
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "file",
+              "reason"
+            ]
+          },
+          "description": "Every provided, truncated or skipped manifest entry not reviewed; binary and empty entries are in neither list. A truncated entry is always skipped (truncated), even when the session lists it."
+        },
+        "ignored_ids": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "How many ids the session listed that were not provided entries; they are ignored."
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "reviewed",
+        "skipped",
+        "ignored_ids"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "full"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "skipped": {
+                "maxItems": 0
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "skipped": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ],
+      "description": "Accounting, not proof."
+    },
+    "rr_file_id": {
+      "type": "string",
+      "pattern": "^f[0-9]{4}$",
+      "description": "A manifest file id, f plus four digits in forgectl's file order."
+    },
+    "rr_severity_counts": {
+      "type": "object",
+      "properties": {
+        "blocker": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "major": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "minor": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "nit": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "info": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unspecified": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Findings with no severity."
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "blocker",
+        "major",
+        "minor",
+        "nit",
+        "info",
+        "unspecified"
+      ],
+      "description": "Counted by review-run from the findings."
+    },
+    "rr_risk": {
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "description": "The session's claim."
+    },
+    "rr_verdict": {
+      "enum": [
+        "approve",
+        "comment",
+        "request_changes"
+      ],
+      "description": "The session's claim, stored as given; never used by review-run to act."
+    },
+    "rr_mode": {
+      "enum": [
+        "headless",
+        "interactive"
+      ]
+    },
+    "rr_skill": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$",
+      "description": "A name Claude Code accepts as a slash command (plugin:skill or a bare name)."
     }
   }
 }

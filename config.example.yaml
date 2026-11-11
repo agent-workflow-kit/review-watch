@@ -4,33 +4,36 @@
 # Scalar keys can also be set as REVIEW_WATCH_<KEY> (nesting joined with __); lists,
 # hooks, repos and the tool commands cannot.
 
-# Hosts to poll. Required, no default; a missing or empty value exits 2.
-# Either a list, or a map that also pins the account login per host:
-#   hosts:
-#     git.example.com:
-#       me: my-login
+# Hosts to poll. Required, no default; a missing or empty value exits 2. A list of host
+# names only: the review account (login and account id) always comes from `forgectl whoami`.
 hosts:
   - git.example.com
 
-# Repo-id globs (path matching: * and ? within a path segment, a ** segment across
-# segments). exclude wins. Global only: a repo cannot set its own scope.
+# Repo-id globs (path matching: * and ? within a path segment, a ** segment matches zero or
+# more whole segments). exclude wins. Global only: a repo cannot set its own scope.
 include: ["**"]
 exclude: []
 
-# Your own account. Unset keys use the authenticated user reported by forgectl.
+# Only the actor name; the review account is forgectl's (`forgectl whoami`).
 me:
-  name: me           # used in the default actor human:<name>
-  # github: my-login
-  # gitlab: my-login
+  name: me           # used in the default actor human:<name>; defaults to the OS username
+
+# Who may start a review automatically. skip (default): a request is started only when the
+# author belongs (GitHub: OWNER, MEMBER or COLLABORATOR; GitLab: the head is not a fork;
+# either host: the login is in tiers.trusted_authors or <host>:<id> is in
+# auto_approve.trusted_author_ids). Anyone else is kept as skipped (author_external) and a
+# human `rerun` starts it. review removes the rule. Global only; not settable from the environment.
+start:
+  external_authors: skip
 
 max_rounds: 3        # rounds per PR across request instances; per-repo override allowed
-max_concurrent: 2    # rounds with a running run; used without jobsctl or when jobsctl reports no limit
-max_attempts: 2      # runs per round before it fails
+max_concurrent: 2    # rounds with a running session; with jobsctl the lower of this and jobsctl's free slots
+max_attempts: 2      # launches per round before it fails
 
 jobs:
   use_jobsctl: auto  # auto, true or false
   queue: reviews     # jobsctl queue; review-watch passes --kill-grace 125s and --max-retries 0
-  pass_env: []       # env var names for jobsctl --pass-env; values come from jobsctl's env file
+  pass_env: []       # env var names passed to the review job: through jobsctl's env file, or from poll's environment without jobsctl
 
 review:
   skill: null        # review-run's default skill when null
@@ -41,13 +44,14 @@ tiers:
   lines: [50, 300]   # changed lines: above the first is tier 1, above the second tier 2
   files: [3, 15]     # changed files: same
   sensitive_globs: []   # paths that make a round at least tier 2; per-repo values add
-  trusted_authors: []   # logins (case-insensitive) treated as members where author_association is null (GitLab); global only
+  trusted_authors: []   # logins (case-insensitive): tier rule where author_association is null (GitLab); on either host they also let the author start a round; global only
   allow_forks: true     # false makes a fork PR tier 3; a per-repo value may only be false
 
 # Paths that make a round tier 3 and block any automatic action. A pattern without a
 # slash matches the last path segment at any depth; a pattern with a slash is anchored at
-# the repo root; ASCII case is folded. Per-repo values add to this list and never remove
-# from it.
+# the repo root; a ** segment matches zero or more whole segments; ASCII case is folded.
+# Patterns are validated at load (no empty, . or .. segment, no leading slash, at most 256
+# characters). Per-repo values add to this list and never remove from it.
 off_limits:
   - ".github/**"
   - ".gitlab-ci.yml"
@@ -66,6 +70,13 @@ off_limits:
   - ".mcp.json"
   - "CLAUDE*.md"
   - "AGENTS.md"
+  - "GEMINI.md"
+  - ".cursor/**"
+  - ".cursorrules"
+  - ".vscode/**"
+  - ".devcontainer/**"
+  - ".envrc"
+  - ".gitattributes"
   - "CODEOWNERS"
   - "**/auth/**"
   - "**/security/**"
@@ -91,24 +102,27 @@ auto_post:
 auto_approve:
   enabled: false
   policy: review-approve   # gatectl policy; pr-comment also needs allow_auto_approve for the repo
-  trusted_author_ids: []   # global only: account ids; an automatic approve needs the PR author's id here
+  trusted_author_ids: []   # global only: <host>:<account id> entries; an automatic approve needs the PR author's entry here
   # paths is per repo only (see repos below): an automatic approve needs every changed path
-  # to match; empty means no automatic approve in that repo.
+  # to match (anchored, case-sensitive, every entry contains a /); empty means no automatic
+  # approve in that repo.
 
 gate:
-  timeout: 60s       # 1s to 86400s; passed to gatectl check --timeout in whole seconds
+  timeout: 60s       # 1s to 600s; passed to gatectl check --timeout in whole seconds
 
 limits:
-  rounds_per_day: 50    # rounds started per local day; at the limit new rounds stay queued; null is off
+  rounds_per_day: 50    # rounds counted per local day at their first launch; at the limit rounds stay queued; null is off
   timezone: null        # IANA zone name; null is the machine's local zone
 
 poll:
   max_snapshots: 30        # snapshots per host and cycle
   recheck_interval: 1h     # how often unchanged items without a live round are re-read
+  deadline: 20m            # whole-cycle deadline, 5m to 2h; the cycle starts nothing new after it
   failure_alert_after: 3   # consecutive failing cycles before post-attention fires for a host
 
 retention:
   closed: 90d        # prune deletes closed items older than this; other items lose old revisions only
+  log: 180d          # prune drops log.jsonl records and events of finished items older than this; the audit is never pruned
 
 cron:
   schedule: "*/5 * * * *"   # five fields of [0-9*/,-] or month and day names
@@ -152,6 +166,6 @@ repos:
       policy: review-post
     auto_approve:
       enabled: false
-      paths: []        # globs; an automatic approve needs every changed path to match
+      paths: []        # globs, each containing a /; an automatic approve needs every changed path to match
     review:
       skill: null

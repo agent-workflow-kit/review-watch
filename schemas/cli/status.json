@@ -75,13 +75,23 @@
         "held": {
           "type": "integer",
           "minimum": 0
+        },
+        "submit_failed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "retry_wait": {
+          "type": "integer",
+          "minimum": 0
         }
       },
       "additionalProperties": false,
       "required": [
         "waiting_slot",
         "daily_limit",
-        "held"
+        "held",
+        "submit_failed",
+        "retry_wait"
       ]
     },
     "last_poll": {
@@ -167,7 +177,7 @@
             "type": "object",
             "properties": {
               "policy": {
-                "$ref": "../defs.json#/$defs/decision_id"
+                "$ref": "../defs.json#/$defs/policy_name"
               },
               "repo": {
                 "$ref": "../defs.json#/$defs/repo_id"

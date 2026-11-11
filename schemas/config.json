@@ -2,39 +2,17 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "review-watch/config.json",
   "title": "review-watch config",
-  "description": "Self-contained (no external $ref). Unknown keys are refused. Defaults are those of docs/interface.md, Config. Cross-field and cross-document rules (docs/interface.md, Config validation) are loader checks that JSON Schema cannot express: per-repo tiers.lines, tiers.files, max_post_tier and max_approve_tier may only be lower or equal; auto_approve.enabled needs auto_post.enabled for the same repo; the gate.timeout upper bound; no safety key from the environment.",
+  "description": "Self-contained (no external $ref). Unknown keys are refused. Defaults are those of docs/interface.md, Config. Cross-field and cross-document rules (docs/interface.md, Config validation) are loader checks that JSON Schema cannot express: per-repo tiers.lines, tiers.files, max_post_tier and max_approve_tier may only be lower or equal; auto_approve.enabled needs auto_post.enabled for the same repo; no safety key from the environment. The glob pattern covers the validation rules a regular expression can express (a loader check enforces the rest).",
   "type": "object",
   "properties": {
     "hosts": {
-      "oneOf": [
-        {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/host"
-          },
-          "minItems": 1,
-          "uniqueItems": true
-        },
-        {
-          "type": "object",
-          "minProperties": 1,
-          "propertyNames": {
-            "$ref": "#/$defs/host"
-          },
-          "additionalProperties": {
-            "type": "object",
-            "properties": {
-              "me": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 128
-              }
-            },
-            "additionalProperties": false
-          }
-        }
-      ],
-      "description": "Required. Hosts to poll: a list, or a map host -> {me: login} to pin the account login."
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/host"
+      },
+      "minItems": 1,
+      "uniqueItems": true,
+      "description": "Required. The host names to poll. The review account always comes from forgectl whoami."
     },
     "include": {
       "type": "array",
@@ -62,17 +40,22 @@
         "name": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 128
-        },
-        "github": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 128
-        },
-        "gitlab": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 128
+          "maxLength": 128,
+          "description": "The actor name; defaults to the OS username."
+        }
+      },
+      "additionalProperties": false
+    },
+    "start": {
+      "type": "object",
+      "properties": {
+        "external_authors": {
+          "enum": [
+            "skip",
+            "review"
+          ],
+          "default": "skip",
+          "description": "skip stores a request whose author does not belong as skipped (author_external); review restores starting for every author. Safety key: global only, never from the environment."
         }
       },
       "additionalProperties": false
@@ -219,7 +202,42 @@
         "$ref": "#/$defs/glob"
       },
       "uniqueItems": true,
-      "description": "Default is the list in the interface's Hard rules; per-repo values add and never remove."
+      "default": [
+        ".github/**",
+        ".gitlab-ci.yml",
+        ".gitlab/**",
+        ".circleci/**",
+        "Jenkinsfile",
+        "azure-pipelines.yml",
+        "Dockerfile*",
+        "docker-compose*",
+        "Makefile",
+        "GNUmakefile",
+        ".husky/**",
+        ".pre-commit-config.yaml",
+        ".gitmodules",
+        "**/.claude/**",
+        ".mcp.json",
+        "CLAUDE*.md",
+        "AGENTS.md",
+        "GEMINI.md",
+        ".cursor/**",
+        ".cursorrules",
+        ".vscode/**",
+        ".devcontainer/**",
+        ".envrc",
+        ".gitattributes",
+        "CODEOWNERS",
+        "**/auth/**",
+        "**/security/**",
+        "**/secrets/**",
+        "**/crypto/**",
+        "*.pem",
+        "*.key",
+        ".env",
+        ".env.*"
+      ],
+      "description": "Matched after ASCII case folding; per-repo values add and never remove."
     },
     "max_post_tier": {
       "enum": [
@@ -247,8 +265,7 @@
           "default": false
         },
         "policy": {
-          "type": "string",
-          "pattern": "^[A-Za-z0-9._:-]{1,64}$",
+          "$ref": "#/$defs/policy_name",
           "default": "review-post"
         }
       },
@@ -262,18 +279,17 @@
           "default": false
         },
         "policy": {
-          "type": "string",
-          "pattern": "^[A-Za-z0-9._:-]{1,64}$",
+          "$ref": "#/$defs/policy_name",
           "default": "review-approve"
         },
         "trusted_author_ids": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/account_id"
+            "$ref": "#/$defs/host_account_id"
           },
           "uniqueItems": true,
           "default": [],
-          "description": "Global only. Account ids (compared by id); an automatic approve requires the PR author's id here."
+          "description": "Global only. Entries are <host>:<account id> and compare both parts; an automatic approve requires the PR author's entry here, and an entry also lets the author start a round (author_external)."
         }
       },
       "additionalProperties": false
@@ -283,9 +299,9 @@
       "properties": {
         "timeout": {
           "type": "string",
-          "pattern": "^[1-9][0-9]*(?:s|m|h|d)$",
+          "pattern": "^(?:[1-9]|[1-9][0-9]|[1-5][0-9]{2}|600)s$|^(?:[1-9]|10)m$",
           "default": "60s",
-          "description": "A duration of 1 s to 86400 s (loader check of the upper bound), passed to gatectl in whole seconds."
+          "description": "A duration of 1 s to 600 s, passed to gatectl in whole seconds."
         }
       },
       "additionalProperties": false
@@ -301,7 +317,7 @@
           "minimum": 1,
           "maximum": 100000,
           "default": 50,
-          "description": "Rounds started per local day; null is off."
+          "description": "Rounds counted per local day at their first launch; null is off."
         },
         "timezone": {
           "type": [
@@ -333,6 +349,12 @@
         "recheck_interval": {
           "$ref": "#/$defs/duration",
           "default": "1h"
+        },
+        "deadline": {
+          "type": "string",
+          "default": "20m",
+          "pattern": "^(?:(?:[5-9]|[1-9][0-9]|1[01][0-9]|120)m|[12]h|(?:30[0-9]|3[1-9][0-9]|[4-6][0-9]{2}|[1-6][0-9]{3}|7[01][0-9]{2}|7200)s)$",
+          "description": "The whole-cycle deadline, 5 m to 2 h."
         }
       },
       "additionalProperties": false
@@ -343,6 +365,10 @@
         "closed": {
           "$ref": "#/$defs/duration",
           "default": "90d"
+        },
+        "log": {
+          "$ref": "#/$defs/duration",
+          "default": "180d"
         }
       },
       "additionalProperties": false
@@ -694,8 +720,7 @@
                   "default": false
                 },
                 "policy": {
-                  "type": "string",
-                  "pattern": "^[A-Za-z0-9._:-]{1,64}$",
+                  "$ref": "#/$defs/policy_name",
                   "default": "review-post"
                 }
               },
@@ -709,18 +734,24 @@
                   "default": false
                 },
                 "policy": {
-                  "type": "string",
-                  "pattern": "^[A-Za-z0-9._:-]{1,64}$",
+                  "$ref": "#/$defs/policy_name",
                   "default": "review-approve"
                 },
                 "paths": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/$defs/glob"
+                    "allOf": [
+                      {
+                        "$ref": "#/$defs/glob"
+                      },
+                      {
+                        "pattern": "/"
+                      }
+                    ]
                   },
                   "uniqueItems": true,
                   "default": [],
-                  "description": "An automatic approve requires every changed path (and previous_path) to match; empty means no automatic approve in this repo."
+                  "description": "Anchored, case-sensitive; every entry must contain a /. An automatic approve requires every changed path (and previous_path) to match; empty means no automatic approve in this repo."
                 }
               },
               "additionalProperties": false
@@ -764,9 +795,9 @@
     "glob": {
       "type": "string",
       "minLength": 1,
-      "maxLength": 512,
-      "pattern": "^[A-Za-z0-9._*?/:@+-]+$",
-      "description": "A repo-id or path glob (Path matching in docs/interface.md: * and ? within a segment, a ** segment across directories)."
+      "maxLength": 256,
+      "pattern": "^(?!/)(?!.*/$)(?!.*//)(?!(?:.*/)?\\.\\.?(?:/|$))(?!.*[^/]\\*\\*)(?!.*\\*\\*[^/])(?!.*(?:^|/)(?:[^/*]*\\*){4})(?!(?:.*?(?:^|/)\\*\\*(?:/|$)){4})[A-Za-z0-9._*?/:@+-]+$",
+      "description": "A repo-id or path glob (Path matching in docs/interface.md): * and ? match within a segment, a ** segment matches zero or more whole segments. Validated at load: no empty segment, no leading slash, no . or .. segment, ** only as a whole segment, at most three * in a segment and three ** in a pattern, at most 256 characters."
     },
     "login": {
       "type": "string",
@@ -775,12 +806,17 @@
       "pattern": "^[A-Za-z0-9._@-]+$",
       "description": "An account login."
     },
-    "account_id": {
+    "policy_name": {
       "type": "string",
-      "minLength": 1,
-      "maxLength": 128,
-      "pattern": "^[A-Za-z0-9][A-Za-z0-9:/_=.+-]{0,127}$",
-      "description": "A host account id as forgectl reports it."
+      "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$",
+      "description": "gatectl's policy name grammar; also valid inside the actor auto:<policy>."
+    },
+    "host_account_id": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 300,
+      "pattern": "^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?:[A-Za-z0-9][A-Za-z0-9:/_=.+-]{0,127}$",
+      "description": "<host>:<account id>, the account id as forgectl reports it."
     }
   }
 }

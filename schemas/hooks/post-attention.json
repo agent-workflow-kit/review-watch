@@ -49,7 +49,7 @@
     "event_id": {
       "type": "string",
       "pattern": "^(?:rw-[a-z2-7]{8}(?:#[0-9]+)?|[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*(?::[0-9]{1,5})?)-(?:post-draft|post-attention|post-post)-[0-9]+$",
-      "description": "<object id>-<hook>-<n>, the deduplication key (n is the cause's sequence)."
+      "description": "<object id>-<hook>-<n>, the deduplication key (n is a per-(object, hook) counter stored with the outbox row)."
     },
     "pr": {
       "oneOf": [
@@ -155,6 +155,33 @@
             "null"
           ],
           "minimum": 0
+        },
+        "code": {
+          "oneOf": [
+            {
+              "enum": [
+                "tool_missing",
+                "tool_too_old",
+                "no_tmux",
+                "schema_newer",
+                "state_unsafe",
+                "plugin_changed",
+                "pass_env_undefined"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "For submit_failed: the blocking code."
+        },
+        "waiting": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "description": "For daily_limit: the number of rounds waiting on the limit."
         }
       },
       "additionalProperties": false,
@@ -164,7 +191,9 @@
         "retryable",
         "stale_reason",
         "host",
-        "consecutive_failures"
+        "consecutive_failures",
+        "code",
+        "waiting"
       ],
       "description": "Closed codes, hosts and counts; never text."
     }

@@ -46,6 +46,9 @@
     },
     "already_running": {
       "$ref": "../defs.json#/$defs/poll_report/properties/already_running"
+    },
+    "deadline_hit": {
+      "$ref": "../defs.json#/$defs/poll_report/properties/deadline_hit"
     }
   },
   "additionalProperties": false,
@@ -63,6 +66,7 @@
     "started",
     "queued",
     "errors",
-    "already_running"
+    "already_running",
+    "deadline_hit"
   ]
 }
